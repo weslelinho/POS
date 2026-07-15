@@ -1,0 +1,24 @@
+<%- include('../partials/layout-top') %>
+<section>
+  <h1>Novo produto</h1>
+  <% if (error) { %><div class="alert error"><%= error %></div><% } %>
+  <form method="post" action="/products" class="card-form">
+    <label>Nome *
+      <input name="name" required value="<%= product?.name || '' %>" />
+    </label>
+    <label>Descrição
+      <textarea name="description"><%= product?.description || '' %></textarea>
+    </label>
+    <label>Preço (R$) *
+      <input name="price" required placeholder="15,00" value="<%= product?.price || '' %>" />
+    </label>
+    <label>Categoria
+      <input name="category" value="<%= product?.category || '' %>" placeholder="Lanche, Bebida..." />
+    </label>
+    <label>Estoque (vazio = ilimitado)
+      <input name="stock_qty" type="number" min="0" value="<%= product?.stock_qty ?? '' %>" />
+    </label>
+    <button class="btn primary" type="submit">Salvar</button>
+  </form>
+</section>
+<%- include('../partials/layout-bottom') %>

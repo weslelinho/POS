@@ -1,0 +1,34 @@
+<%- include('../partials/layout-top') %>
+<section>
+  <div class="page-head">
+    <h1>Bases</h1>
+    <a class="btn primary" href="/bases/new">Nova base</a>
+  </div>
+  <p class="muted">Chapters / capítulos do motoclube.</p>
+  <table>
+    <thead>
+      <tr>
+        <th>Nome</th>
+        <th>Cidade</th>
+        <th>UF</th>
+        <th>Status</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% bases.forEach(b => { %>
+      <tr>
+        <td><%= b.name %></td>
+        <td><%= b.city || '—' %></td>
+        <td><%= b.state || '—' %></td>
+        <td><%= b.active ? 'Ativo' : 'Inativo' %></td>
+      </tr>
+      <% }) %>
+      <% if (!bases.length) { %>
+      <tr>
+        <td colspan="4">Nenhuma base cadastrada.</td>
+      </tr>
+      <% } %>
+    </tbody>
+  </table>
+</section>
+<%- include('../partials/layout-bottom') %>

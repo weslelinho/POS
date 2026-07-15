@@ -1,0 +1,33 @@
+{
+  "name": "pos-motoclube",
+  "version": "1.0.0",
+  "description": "POS de vendas informais para evento de motoclube — lanches, PIX/dinheiro e fiado",
+  "main": "src/server.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js",
+    "db:init": "node src/db/init.js",
+    "db:seed": "node src/db/seed.js"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "better-sqlite3": "^11.7.0",
+    "dotenv": "^16.4.7",
+    "ejs": "^3.1.10",
+    "express": "^4.21.2",
+    "express-session": "^1.18.1",
+    "method-override": "^3.0.0"
+  },
+  "keywords": [
+    "pos",
+    "sqlite",
+    "motoclube",
+    "fiado"
+  ],
+  "license": "UNLICENSED",
+  "private": true
+}

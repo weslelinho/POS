@@ -1,0 +1,24 @@
+<%- include('../partials/layout-top') %>
+<section>
+  <h1>Novo usuário</h1>
+  <% if (error) { %><div class="alert error"><%= error %></div><% } %>
+  <form method="post" action="/users" class="card-form">
+    <label>Nome *
+      <input name="name" required value="<%= userForm?.name || '' %>" />
+    </label>
+    <label>Usuário (login) *
+      <input name="username" required value="<%= userForm?.username || '' %>" />
+    </label>
+    <label>Senha *
+      <input type="password" name="password" required />
+    </label>
+    <label>Perfil *
+      <select name="role" required>
+        <option value="seller" <%= userForm?.role === 'seller' ? 'selected' : '' %>>Vendedor</option>
+        <option value="admin" <%= userForm?.role === 'admin' ? 'selected' : '' %>>Admin</option>
+      </select>
+    </label>
+    <button class="btn primary" type="submit">Salvar</button>
+  </form>
+</section>
+<%- include('../partials/layout-bottom') %>

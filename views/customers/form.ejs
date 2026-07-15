@@ -1,0 +1,38 @@
+<%- include('../partials/layout-top') %>
+<section>
+  <h1>Novo cliente</h1>
+  <% if (error) { %><div class="alert error"><%= error %></div><% } %>
+  <form method="post" action="/customers" class="card-form">
+    <label>Nome *
+      <input name="name" required value="<%= customer?.name || '' %>" />
+    </label>
+    <label>Tipo *
+      <select name="customer_type" required>
+        <option value="member" <%= customer?.customer_type === 'member' ? 'selected' : '' %>>Membro do motoclube</option>
+        <option value="external" <%= customer?.customer_type === 'external' ? 'selected' : '' %>>Cliente externo</option>
+      </select>
+    </label>
+    <label>Base (chapter)
+      <select name="base_id">
+        <option value="">— Sem base —</option>
+        <% (bases || []).forEach(b => { %>
+          <option value="<%= b.id %>" <%= String(customer?.base_id) === String(b.id) ? 'selected' : '' %>><%= b.name %></option>
+        <% }) %>
+      </select>
+    </label>
+    <label>Apelido / callsign
+      <input name="club_nickname" value="<%= customer?.club_nickname || '' %>" />
+    </label>
+    <label>Telefone
+      <input name="phone" value="<%= customer?.phone || '' %>" />
+    </label>
+    <label>Documento (opcional)
+      <input name="document" value="<%= customer?.document || '' %>" />
+    </label>
+    <label>Observações
+      <textarea name="notes"><%= customer?.notes || '' %></textarea>
+    </label>
+    <button class="btn primary" type="submit">Salvar</button>
+  </form>
+</section>
+<%- include('../partials/layout-bottom') %>

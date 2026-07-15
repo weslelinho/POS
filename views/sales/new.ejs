@@ -1,0 +1,130 @@
+<%- include('../partials/layout-top') %>
+<section>
+  <h1>Nova venda</h1>
+  <% if (error) { %><div class="alert error"><%= error %></div><% } %>
+  <% if (success) { %><div class="alert ok"><%= success %></div><% } %>
+
+  <form id="sale-form" method="post" action="/sales" class="sale-grid">
+    <div>
+      <h2>Itens</h2>
+      <div class="product-list">
+        <% products.forEach(p => { %>
+        <button type="button" class="product-chip" data-id="<%= p.id %>" data-name="<%= p.name %>" data-price="<%= p.price_cents %>">
+          <strong><%= p.name %></strong>
+          <span><%= formatMoney(p.price_cents) %></span>
+        </button>
+        <% }) %>
+      </div>
+      <table id="cart">
+        <thead>
+          <tr><th>Produto</th><th>Qtd</th><th>Total</th><th></th></tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+      <p class="total">Total: <strong id="cart-total">R$ 0,00</strong></p>
+    </div>
+
+    <div class="card-form">
+      <h2>Pagamento</h2>
+      <label>Forma *
+        <select name="payment_method" id="payment_method" required>
+          <option value="cash">Dinheiro</option>
+          <option value="pix">PIX</option>
+          <option value="credit">Fiado (membro)</option>
+        </select>
+      </label>
+      <label>Cliente (obrigatório no fiado)
+        <select name="customer_id" id="customer_id">
+          <option value="">— Avulso / sem cadastro —</option>
+          <optgroup label="Membros">
+            <% members.forEach(m => { %>
+              <option value="<%= m.id %>"><%= m.name %><%= m.club_nickname ? ' (' + m.club_nickname + ')' : '' %></option>
+            <% }) %>
+          </optgroup>
+          <optgroup label="Externos">
+            <% externals.forEach(e => { %>
+              <option value="<%= e.id %>"><%= e.name %></option>
+            <% }) %>
+          </optgroup>
+        </select>
+      </label>
+      <label>Observações
+        <textarea name="notes"></textarea>
+      </label>
+      <input type="hidden" name="items" id="items-json" value="[]" />
+      <button class="btn primary" type="submit">Finalizar venda</button>
+    </div>
+  </form>
+</section>
+<script>
+  const cart = new Map();
+  const tbody = document.querySelector('#cart tbody');
+  const totalEl = document.querySelector('#cart-total');
+  const itemsInput = document.querySelector('#items-json');
+
+  function money(cents) {
+    return (cents / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+  }
+
+  function render() {
+    tbody.innerHTML = '';
+    let total = 0;
+    const items = [];
+    for (const [id, row] of cart) {
+      const line = row.price * row.qty;
+      total += line;
+      items.push({ product_id: Number(id), quantity: row.qty });
+      const tr = document.createElement('tr');
+      tr.innerHTML = `<td>${row.name}</td>
+        <td><input type="number" min="1" value="${row.qty}" data-id="${id}" class="qty" /></td>
+        <td>${money(line)}</td>
+        <td><button type="button" data-remove="${id}" class="btn ghost">✕</button></td>`;
+      tbody.appendChild(tr);
+    }
+    totalEl.textContent = money(total);
+    itemsInput.value = JSON.stringify(items);
+  }
+
+  document.querySelectorAll('.product-chip').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const id = btn.dataset.id;
+      const current = cart.get(id) || { name: btn.dataset.name, price: Number(btn.dataset.price), qty: 0 };
+      current.qty += 1;
+      cart.set(id, current);
+      render();
+    });
+  });
+
+  tbody.addEventListener('change', (e) => {
+    if (e.target.classList.contains('qty')) {
+      const id = e.target.dataset.id;
+      const row = cart.get(id);
+      row.qty = Math.max(1, Number(e.target.value) || 1);
+      cart.set(id, row);
+      render();
+    }
+  });
+
+  tbody.addEventListener('click', (e) => {
+    const id = e.target.dataset.remove;
+    if (id) {
+      cart.delete(id);
+      render();
+    }
+  });
+
+  document.querySelector('#sale-form').addEventListener('submit', (e) => {
+    if (cart.size === 0) {
+      e.preventDefault();
+      alert('Adicione ao menos um produto.');
+      return;
+    }
+    const method = document.querySelector('#payment_method').value;
+    const customer = document.querySelector('#customer_id').value;
+    if (method === 'credit' && !customer) {
+      e.preventDefault();
+      alert('Selecione o membro para venda fiado.');
+    }
+  });
+</script>
+<%- include('../partials/layout-bottom') %>

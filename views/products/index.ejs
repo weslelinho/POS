@@ -1,0 +1,32 @@
+<%- include('../partials/layout-top') %>
+<section>
+  <div class="page-head">
+    <h1>Produtos</h1>
+    <% if (currentUser.role === 'admin') { %>
+      <a class="btn primary" href="/products/new">Novo produto</a>
+    <% } %>
+  </div>
+  <table>
+    <thead>
+      <tr>
+        <th>Nome</th>
+        <th>Categoria</th>
+        <th>Preço</th>
+        <th>Estoque</th>
+        <th>Status</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% products.forEach(p => { %>
+      <tr>
+        <td><%= p.name %></td>
+        <td><%= p.category || '—' %></td>
+        <td><%= formatMoney(p.price_cents) %></td>
+        <td><%= p.stock_qty == null ? '∞' : p.stock_qty %></td>
+        <td><%= p.active ? 'Ativo' : 'Inativo' %></td>
+      </tr>
+      <% }) %>
+    </tbody>
+  </table>
+</section>
+<%- include('../partials/layout-bottom') %>

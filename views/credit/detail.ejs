@@ -1,0 +1,61 @@
+<%- include('../partials/layout-top') %>
+<section>
+  <div class="page-head">
+    <h1>Fiado — <%= customer.name %></h1>
+    <a class="btn" href="/credit">Voltar</a>
+  </div>
+  <p>Saldo em aberto: <strong><%= formatMoney(account?.balance_cents || 0) %></strong></p>
+
+  <% if (error) { %><div class="alert error"><%= error %></div><% } %>
+  <% if (success) { %><div class="alert ok"><%= success %></div><% } %>
+
+  <% if ((account?.balance_cents || 0) > 0) { %>
+  <form method="post" action="/credit/<%= customer.id %>/pay" class="card-form">
+    <h2>Registrar pagamento</h2>
+    <label>Valor (R$) *
+      <input name="amount" required placeholder="0,00" />
+    </label>
+    <label>Forma *
+      <select name="payment_method" required>
+        <option value="pix">PIX</option>
+        <option value="cash">Dinheiro</option>
+      </select>
+    </label>
+    <label>Observações
+      <textarea name="notes"></textarea>
+    </label>
+    <button class="btn primary" type="submit">Quitar</button>
+  </form>
+  <% } %>
+
+  <h2>Extrato</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Data</th>
+        <th>Tipo</th>
+        <th>Valor</th>
+        <th>Pagamento</th>
+        <th>Saldo após</th>
+        <th>Obs.</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% ledger.forEach(l => { %>
+      <tr>
+        <td><%= l.created_at %></td>
+        <td>
+          <% if (l.entry_type === 'charge') { %>Cobrança
+          <% } else if (l.entry_type === 'payment') { %>Pagamento
+          <% } else { %>Ajuste<% } %>
+        </td>
+        <td><%= formatMoney(l.amount_cents) %></td>
+        <td><%= l.payment_method || '—' %></td>
+        <td><%= formatMoney(l.balance_after_cents) %></td>
+        <td><%= l.notes || '—' %></td>
+      </tr>
+      <% }) %>
+    </tbody>
+  </table>
+</section>
+<%- include('../partials/layout-bottom') %>

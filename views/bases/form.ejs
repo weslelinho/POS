@@ -1,0 +1,22 @@
+<%- include('../partials/layout-top') %>
+<section>
+  <h1>Nova base</h1>
+  <p class="muted">Cadastro de chapter / capítulo do motoclube.</p>
+  <% if (error) { %><div class="alert error"><%= error %></div><% } %>
+  <form method="post" action="/bases" class="card-form">
+    <label>Nome *
+      <input name="name" required value="<%= base?.name || '' %>" placeholder="Ex.: Base São Paulo" />
+    </label>
+    <label>Cidade
+      <input name="city" value="<%= base?.city || '' %>" />
+    </label>
+    <label>UF
+      <input name="state" maxlength="2" value="<%= base?.state || '' %>" placeholder="SP" />
+    </label>
+    <label>Observações
+      <textarea name="notes"><%= base?.notes || '' %></textarea>
+    </label>
+    <button class="btn primary" type="submit">Salvar</button>
+  </form>
+</section>
+<%- include('../partials/layout-bottom') %>

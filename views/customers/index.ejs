@@ -1,0 +1,167 @@
+<%- include('../partials/layout-top') %>
+<section>
+  <div class="page-head">
+    <h1>Clientes</h1>
+    <a class="btn primary" href="/customers/new">Novo cliente</a>
+  </div>
+  <table>
+    <thead>
+      <tr>
+        <th>Nome</th>
+        <th>Tipo</th>
+        <th>Base</th>
+        <th>Apelido</th>
+        <th>Telefone</th>
+        <th>Status</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      <% customers.forEach(c => { %>
+      <tr>
+        <td><%= c.name %></td>
+        <td><%= c.customer_type === 'member' ? 'Membro' : 'Externo' %></td>
+        <td><%= c.base_name || '—' %></td>
+        <td><%= c.club_nickname || '—' %></td>
+        <td><%= c.phone || '—' %></td>
+        <td><%= c.active ? 'Ativo' : 'Inativo' %></td>
+        <td>
+          <button
+            type="button"
+            class="btn"
+            data-edit-customer
+            data-id="<%= c.id %>"
+            data-name="<%= c.name %>"
+            data-customer-type="<%= c.customer_type %>"
+            data-base-id="<%= c.base_id || '' %>"
+            data-club-nickname="<%= c.club_nickname || '' %>"
+            data-phone="<%= c.phone || '' %>"
+            data-document="<%= c.document || '' %>"
+            data-notes="<%= c.notes || '' %>"
+            data-active="<%= c.active ? 1 : 0 %>"
+          >Editar</button>
+        </td>
+      </tr>
+      <% }) %>
+    </tbody>
+  </table>
+</section>
+
+<dialog id="edit-customer-modal" class="modal">
+  <form method="post" action="/customers/0" class="card-form modal-form" id="edit-customer-form">
+    <div class="modal-head">
+      <h2>Editar cliente</h2>
+      <button type="button" class="btn ghost" data-close-modal aria-label="Fechar">×</button>
+    </div>
+    <% if (typeof editError !== 'undefined' && editError) { %><div class="alert error"><%= editError %></div><% } %>
+    <label>Nome *
+      <input name="name" id="edit-name" required />
+    </label>
+    <label>Tipo *
+      <select name="customer_type" id="edit-customer-type" required>
+        <option value="member">Membro do motoclube</option>
+        <option value="external">Cliente externo</option>
+      </select>
+    </label>
+    <label>Base (chapter)
+      <select name="base_id" id="edit-base-id">
+        <option value="">— Sem base —</option>
+        <% (bases || []).forEach(b => { %>
+          <option value="<%= b.id %>"><%= b.name %></option>
+        <% }) %>
+      </select>
+    </label>
+    <label>Apelido / callsign
+      <input name="club_nickname" id="edit-club-nickname" />
+    </label>
+    <label>Telefone
+      <input name="phone" id="edit-phone" />
+    </label>
+    <label>Documento (opcional)
+      <input name="document" id="edit-document" />
+    </label>
+    <label>Status
+      <select name="active" id="edit-active">
+        <option value="1">Ativo</option>
+        <option value="0">Inativo</option>
+      </select>
+    </label>
+    <label>Observações
+      <textarea name="notes" id="edit-notes"></textarea>
+    </label>
+    <div class="modal-actions">
+      <button type="button" class="btn ghost" data-close-modal>Cancelar</button>
+      <button class="btn primary" type="submit">Salvar</button>
+    </div>
+  </form>
+</dialog>
+
+<script>
+  (function () {
+    const modal = document.getElementById('edit-customer-modal');
+    const form = document.getElementById('edit-customer-form');
+    if (!modal || !form) return;
+
+    function fillForm(data) {
+      form.action = '/customers/' + data.id;
+      document.getElementById('edit-name').value = data.name || '';
+      document.getElementById('edit-customer-type').value = data.customerType || 'external';
+      document.getElementById('edit-base-id').value = data.baseId || '';
+      document.getElementById('edit-club-nickname').value = data.clubNickname || '';
+      document.getElementById('edit-phone').value = data.phone || '';
+      document.getElementById('edit-document').value = data.document || '';
+      document.getElementById('edit-notes').value = data.notes || '';
+      document.getElementById('edit-active').value = String(data.active ?? 1);
+    }
+
+    function openModal(data) {
+      fillForm(data);
+      if (typeof modal.showModal === 'function') modal.showModal();
+      else modal.setAttribute('open', '');
+    }
+
+    function closeModal() {
+      if (typeof modal.close === 'function') modal.close();
+      else modal.removeAttribute('open');
+    }
+
+    document.querySelectorAll('[data-edit-customer]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        openModal({
+          id: btn.dataset.id,
+          name: btn.dataset.name,
+          customerType: btn.dataset.customerType,
+          baseId: btn.dataset.baseId,
+          clubNickname: btn.dataset.clubNickname,
+          phone: btn.dataset.phone,
+          document: btn.dataset.document,
+          notes: btn.dataset.notes,
+          active: btn.dataset.active,
+        });
+      });
+    });
+
+    document.querySelectorAll('[data-close-modal]').forEach((btn) => {
+      btn.addEventListener('click', closeModal);
+    });
+
+    modal.addEventListener('click', (event) => {
+      if (event.target === modal) closeModal();
+    });
+
+    <% if (typeof editError !== 'undefined' && editError && typeof editCustomerId !== 'undefined' && editCustomerId) { %>
+    openModal({
+      id: <%= JSON.stringify(String(editCustomerId)) %>,
+      name: <%= JSON.stringify((typeof editCustomer !== 'undefined' && editCustomer?.name) || '') %>,
+      customerType: <%= JSON.stringify((typeof editCustomer !== 'undefined' && editCustomer?.customer_type) || 'external') %>,
+      baseId: <%= JSON.stringify((typeof editCustomer !== 'undefined' && editCustomer?.base_id) || '') %>,
+      clubNickname: <%= JSON.stringify((typeof editCustomer !== 'undefined' && editCustomer?.club_nickname) || '') %>,
+      phone: <%= JSON.stringify((typeof editCustomer !== 'undefined' && editCustomer?.phone) || '') %>,
+      document: <%= JSON.stringify((typeof editCustomer !== 'undefined' && editCustomer?.document) || '') %>,
+      notes: <%= JSON.stringify((typeof editCustomer !== 'undefined' && editCustomer?.notes) || '') %>,
+      active: <%= JSON.stringify((typeof editCustomer !== 'undefined' && editCustomer?.active) ?? 1) %>,
+    });
+    <% } %>
+  })();
+</script>
+<%- include('../partials/layout-bottom') %>

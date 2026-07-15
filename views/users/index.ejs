@@ -1,0 +1,30 @@
+<%- include('../partials/layout-top') %>
+<section>
+  <div class="page-head">
+    <h1>Usuários</h1>
+    <a class="btn primary" href="/users/new">Novo usuário</a>
+  </div>
+  <table>
+    <thead>
+      <tr>
+        <th>Nome</th>
+        <th>Usuário</th>
+        <th>Perfil</th>
+        <th>Status</th>
+        <th>Criado em</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% users.forEach(u => { %>
+      <tr>
+        <td><%= u.name %></td>
+        <td><%= u.username %></td>
+        <td><%= u.role === 'admin' ? 'Admin' : 'Vendedor' %></td>
+        <td><%= u.active ? 'Ativo' : 'Inativo' %></td>
+        <td><%= u.created_at %></td>
+      </tr>
+      <% }) %>
+    </tbody>
+  </table>
+</section>
+<%- include('../partials/layout-bottom') %>

@@ -1,0 +1,42 @@
+<%- include('../partials/layout-top') %>
+<section>
+  <div class="page-head">
+    <h1>Vendas</h1>
+    <a class="btn primary" href="/sales/new">Nova venda</a>
+  </div>
+  <table>
+    <thead>
+      <tr>
+        <th>Nº</th>
+        <th>Data</th>
+        <th>Cliente</th>
+        <th>Vendedor</th>
+        <th>Pagamento</th>
+        <th>Status pag.</th>
+        <th>Total</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% sales.forEach(s => { %>
+      <tr>
+        <td><%= s.sale_number %></td>
+        <td><%= s.sold_at %></td>
+        <td><%= s.customer_name || 'Avulso' %></td>
+        <td><%= s.seller_name %></td>
+        <td>
+          <% if (s.payment_method === 'cash') { %>Dinheiro
+          <% } else if (s.payment_method === 'pix') { %>PIX
+          <% } else { %>Fiado<% } %>
+        </td>
+        <td>
+          <% if (s.payment_status === 'paid') { %>Pago
+          <% } else if (s.payment_status === 'credit') { %>Em aberto
+          <% } else { %>Parcial<% } %>
+        </td>
+        <td><%= formatMoney(s.total_cents) %></td>
+      </tr>
+      <% }) %>
+    </tbody>
+  </table>
+</section>
+<%- include('../partials/layout-bottom') %>

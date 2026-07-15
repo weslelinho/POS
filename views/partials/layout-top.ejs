@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title><%= title %> · POS Motoclube</title>
+  <link rel="stylesheet" href="/public/styles.css" />
+</head>
+<body>
+  <% if (currentUser) { %>
+  <header class="topbar">
+    <div class="brand">POS Motoclube</div>
+    <nav>
+      <a href="/dashboard">Painel</a>
+      <a href="/sales/new">Nova venda</a>
+      <a href="/sales">Vendas</a>
+      <a href="/customers">Clientes</a>
+      <a href="/bases">Bases</a>
+      <a href="/products">Produtos</a>
+      <a href="/credit">Fiado</a>
+      <% if (currentUser.role === 'admin') { %>
+        <a href="/users">Usuários</a>
+      <% } %>
+    </nav>
+    <div class="userbox">
+      <span><%= currentUser.name %> (<%= currentUser.role %>)</span>
+      <form action="/logout" method="post" class="inline">
+        <button type="submit" class="btn ghost">Sair</button>
+      </form>
+    </div>
+  </header>
+  <% } %>
+  <main class="container">
