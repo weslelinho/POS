@@ -173,6 +173,58 @@ th { color: var(--muted); font-weight: 600; background: rgba(0,0,0,0.35); }
 
 .auth .card-form { text-align: left; margin: 0 auto; }
 
+.cash-helper {
+  display: grid;
+  gap: 0.65rem;
+  padding: 0.85rem;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.28);
+}
+
+.cash-helper-hint {
+  margin: 0;
+  font-size: 0.82rem;
+}
+
+.cash-feedback {
+  padding: 0.65rem 0.75rem;
+  border-radius: 8px;
+  font-size: 0.95rem;
+  border: 1px solid var(--line);
+  background: rgba(15, 15, 15, 0.9);
+}
+
+.cash-feedback.is-exact {
+  border-color: var(--ok);
+  color: #9ed4b0;
+}
+
+.cash-feedback.is-change {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.cash-feedback.is-missing,
+.cash-feedback.is-error {
+  border-color: var(--err);
+  color: #e8a59c;
+}
+
+.checkbox-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.55rem;
+  grid-template-columns: none;
+  color: var(--text);
+}
+
+.checkbox-row input[type="checkbox"] {
+  width: auto;
+  margin-top: 0.2rem;
+  flex-shrink: 0;
+}
+
 .sale-grid {
   display: grid;
   grid-template-columns: 1.4fr 1fr;

@@ -41,16 +41,38 @@
           <option value="">— Avulso / sem cadastro —</option>
           <optgroup label="Membros">
             <% members.forEach(m => { %>
-              <option value="<%= m.id %>"><%= m.name %><%= m.club_nickname ? ' (' + m.club_nickname + ')' : '' %></option>
+              <option value="<%= m.id %>" data-member="1"><%= m.name %><%= m.club_nickname ? ' (' + m.club_nickname + ')' : '' %></option>
             <% }) %>
           </optgroup>
           <optgroup label="Externos">
             <% externals.forEach(e => { %>
-              <option value="<%= e.id %>"><%= e.name %></option>
+              <option value="<%= e.id %>" data-member="0"><%= e.name %></option>
             <% }) %>
           </optgroup>
         </select>
       </label>
+
+      <div id="cash-helper" class="cash-helper">
+        <label>Valor em dinheiro (R$)
+          <input
+            type="text"
+            name="cash_received"
+            id="cash_received"
+            inputmode="decimal"
+            placeholder="Ex: 50,00"
+            autocomplete="off"
+          />
+        </label>
+        <div id="cash-feedback" class="cash-feedback" hidden></div>
+        <label id="remainder-credit-wrap" class="checkbox-row" hidden>
+          <input type="checkbox" name="remainder_as_credit" id="remainder_as_credit" value="1" />
+          <span>Lançar valor faltante no fiado do membro</span>
+        </label>
+        <p id="cash-helper-hint" class="muted cash-helper-hint">
+          Digite o valor recebido para calcular troco ou o que falta.
+        </p>
+      </div>
+
       <label>Observações
         <textarea name="notes"></textarea>
       </label>
@@ -66,6 +88,15 @@
   const itemsInput = document.querySelector('#items-json');
   const form = document.querySelector('#sale-form');
   const finishBtn = document.querySelector('#btn-finish');
+  const paymentMethodEl = document.querySelector('#payment_method');
+  const customerEl = document.querySelector('#customer_id');
+  const cashHelper = document.querySelector('#cash-helper');
+  const cashReceivedEl = document.querySelector('#cash_received');
+  const cashFeedback = document.querySelector('#cash-feedback');
+  const remainderWrap = document.querySelector('#remainder-credit-wrap');
+  const remainderCreditEl = document.querySelector('#remainder_as_credit');
+
+  let cartTotalCents = 0;
 
   function money(cents) {
     return (Number(cents) / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -79,6 +110,90 @@
       .replace(/"/g, '&quot;');
   }
 
+  function parseMoneyToCents(raw) {
+    const text = String(raw || '').trim();
+    if (!text) return null;
+    // 50,00 / 1.250,50 → BR; 50 / 50.00 → ponto decimal
+    const normalized = text.includes(',')
+      ? text.replace(/\./g, '').replace(',', '.')
+      : text;
+    const value = Number(normalized);
+    if (!Number.isFinite(value) || value < 0) return NaN;
+    return Math.round(value * 100);
+  }
+
+  function isSelectedMember() {
+    const opt = customerEl.selectedOptions[0];
+    return Boolean(opt && opt.dataset.member === '1');
+  }
+
+  function updateCashHelper() {
+    const isCash = paymentMethodEl.value === 'cash';
+    cashHelper.hidden = !isCash;
+    if (!isCash) {
+      cashFeedback.hidden = true;
+      remainderWrap.hidden = true;
+      remainderCreditEl.checked = false;
+      return;
+    }
+
+    const received = parseMoneyToCents(cashReceivedEl.value);
+    if (received === null) {
+      cashFeedback.hidden = true;
+      cashFeedback.textContent = '';
+      cashFeedback.className = 'cash-feedback';
+      remainderWrap.hidden = true;
+      remainderCreditEl.checked = false;
+      return;
+    }
+
+    if (Number.isNaN(received)) {
+      cashFeedback.hidden = false;
+      cashFeedback.className = 'cash-feedback is-error';
+      cashFeedback.textContent = 'Valor inválido.';
+      remainderWrap.hidden = true;
+      return;
+    }
+
+    cashFeedback.hidden = false;
+    const diff = received - cartTotalCents;
+
+    if (cartTotalCents <= 0) {
+      cashFeedback.className = 'cash-feedback';
+      cashFeedback.textContent = 'Adicione itens para calcular.';
+      remainderWrap.hidden = true;
+      return;
+    }
+
+    if (diff > 0) {
+      cashFeedback.className = 'cash-feedback is-change';
+      cashFeedback.innerHTML = `Troco a devolver: <strong>${money(diff)}</strong>`;
+      remainderWrap.hidden = true;
+      remainderCreditEl.checked = false;
+      return;
+    }
+
+    if (diff === 0) {
+      cashFeedback.className = 'cash-feedback is-exact';
+      cashFeedback.textContent = 'Valor exato — sem troco.';
+      remainderWrap.hidden = true;
+      remainderCreditEl.checked = false;
+      return;
+    }
+
+    const missing = -diff;
+    cashFeedback.className = 'cash-feedback is-missing';
+    cashFeedback.innerHTML = `Faltam <strong>${money(missing)}</strong>`;
+
+    if (isSelectedMember()) {
+      remainderWrap.hidden = false;
+    } else {
+      remainderWrap.hidden = true;
+      remainderCreditEl.checked = false;
+      cashFeedback.innerHTML += '. Selecione um membro para lançar o restante no fiado.';
+    }
+  }
+
   function syncItems() {
     const items = [];
     let total = 0;
@@ -87,7 +202,9 @@
       total += row.price * row.qty;
     }
     itemsInput.value = JSON.stringify(items);
+    cartTotalCents = total;
     totalEl.textContent = money(total);
+    updateCashHelper();
     return items;
   }
 
@@ -155,6 +272,11 @@
     }
   });
 
+  paymentMethodEl.addEventListener('change', updateCashHelper);
+  customerEl.addEventListener('change', updateCashHelper);
+  cashReceivedEl.addEventListener('input', updateCashHelper);
+  remainderCreditEl.addEventListener('change', updateCashHelper);
+
   form.addEventListener('submit', (e) => {
     syncItems();
     if (cart.size === 0) {
@@ -162,15 +284,41 @@
       alert('Adicione ao menos um produto.');
       return;
     }
-    const method = document.querySelector('#payment_method').value;
-    const customer = document.querySelector('#customer_id').value;
+    const method = paymentMethodEl.value;
+    const customer = customerEl.value;
     if (method === 'credit' && !customer) {
       e.preventDefault();
       alert('Selecione o membro para venda fiado.');
       return;
     }
+
+    if (method === 'cash') {
+      const received = parseMoneyToCents(cashReceivedEl.value);
+      if (received !== null) {
+        if (Number.isNaN(received)) {
+          e.preventDefault();
+          alert('Valor em dinheiro inválido.');
+          return;
+        }
+        if (received < cartTotalCents) {
+          if (!remainderCreditEl.checked) {
+            e.preventDefault();
+            alert('Valor insuficiente. Informe o valor completo ou lance o restante no fiado (membro).');
+            return;
+          }
+          if (!isSelectedMember()) {
+            e.preventDefault();
+            alert('Selecione um membro para lançar o valor faltante no fiado.');
+            return;
+          }
+        }
+      }
+    }
+
     finishBtn.disabled = true;
     finishBtn.textContent = 'Registrando…';
   });
+
+  updateCashHelper();
 </script>
 <%- include('../partials/layout-bottom') %>

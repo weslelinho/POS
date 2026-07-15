@@ -22,6 +22,75 @@ function buildSaleTotals(items, discountCents = 0) {
   return { subtotal_cents: subtotal, discount_cents: discount, total_cents: total };
 }
 
+/**
+ * Calcula quitação em dinheiro: troco, valor exato ou restante (opcionalmente no fiado).
+ * amountReceivedCents null → assume pagamento integral (compatível com fluxo antigo).
+ */
+function calcCashSettlement(totalCents, amountReceivedCents, { remainderAsCredit = false, customer = null } = {}) {
+  if (amountReceivedCents == null) {
+    return {
+      amount_paid_cents: totalCents,
+      change_cents: 0,
+      credit_cents: 0,
+      payment_status: 'paid',
+    };
+  }
+
+  const received = Math.round(Number(amountReceivedCents));
+  if (!Number.isFinite(received) || received < 0) {
+    throw new Error('Valor em dinheiro inválido.');
+  }
+
+  if (received >= totalCents) {
+    return {
+      amount_paid_cents: totalCents,
+      change_cents: received - totalCents,
+      credit_cents: 0,
+      payment_status: 'paid',
+    };
+  }
+
+  const remainder = totalCents - received;
+  if (!remainderAsCredit) {
+    throw new Error(
+      `Valor insuficiente. Faltam ${(remainder / 100).toLocaleString('pt-BR', {
+        style: 'currency',
+        currency: 'BRL',
+      })}.`
+    );
+  }
+
+  assertCreditSaleAllowed(customer);
+
+  return {
+    amount_paid_cents: received,
+    change_cents: 0,
+    credit_cents: remainder,
+    payment_status: received > 0 ? 'partial' : 'credit',
+  };
+}
+
+function chargeCustomerCredit(db, { customerId, saleId, amountCents, notes, sellerId }) {
+  if (!amountCents || amountCents <= 0) return;
+
+  let account = db.prepare('SELECT * FROM credit_accounts WHERE customer_id = ?').get(customerId);
+  if (!account) {
+    db.prepare('INSERT INTO credit_accounts (customer_id, balance_cents) VALUES (?, 0)').run(customerId);
+    account = { balance_cents: 0 };
+  }
+
+  const newBalance = account.balance_cents + amountCents;
+  db.prepare(
+    `UPDATE credit_accounts SET balance_cents = ?, updated_at = datetime('now', 'localtime') WHERE customer_id = ?`
+  ).run(newBalance, customerId);
+
+  db.prepare(
+    `INSERT INTO credit_ledger (
+      customer_id, sale_id, entry_type, amount_cents, payment_method, balance_after_cents, notes, created_by
+    ) VALUES (?, ?, 'charge', ?, NULL, ?, ?, ?)`
+  ).run(customerId, saleId, amountCents, newBalance, notes, sellerId);
+}
+
 function nextSaleNumber(db, date = new Date()) {
   const y = date.getFullYear();
   const m = String(date.getMonth() + 1).padStart(2, '0');
@@ -43,6 +112,7 @@ function nextSaleNumber(db, date = new Date()) {
 
 /**
  * Registra venda à vista (cash/pix) ou fiado (credit).
+ * Em dinheiro: aceita valor recebido para calcular troco ou lançar restante no fiado (membro).
  * Em fiado: cria/atualiza credit_accounts e lança charge no credit_ledger.
  */
 function createSale(db, payload) {
@@ -53,6 +123,8 @@ function createSale(db, payload) {
     items,
     discountCents = 0,
     notes = null,
+    amountReceivedCents = null,
+    remainderAsCredit = false,
   } = payload;
 
   if (!items?.length) {
@@ -94,8 +166,35 @@ function createSale(db, payload) {
     }
 
     const totals = buildSaleTotals(resolvedItems, discountCents);
-    const paymentStatus = paymentMethod === 'credit' ? 'credit' : 'paid';
-    const amountPaid = paymentMethod === 'credit' ? 0 : totals.total_cents;
+
+    let paymentStatus;
+    let amountPaid;
+    let changeCents = 0;
+    let creditCents = 0;
+    let storedPaymentMethod = paymentMethod;
+
+    if (paymentMethod === 'credit') {
+      paymentStatus = 'credit';
+      amountPaid = 0;
+      creditCents = totals.total_cents;
+    } else if (paymentMethod === 'cash') {
+      const settlement = calcCashSettlement(totals.total_cents, amountReceivedCents, {
+        remainderAsCredit,
+        customer,
+      });
+      paymentStatus = settlement.payment_status;
+      amountPaid = settlement.amount_paid_cents;
+      changeCents = settlement.change_cents;
+      creditCents = settlement.credit_cents;
+      // Restante no fiado: forma principal permanece dinheiro; status partial/credit
+      if (creditCents > 0 && amountPaid === 0) {
+        storedPaymentMethod = 'credit';
+      }
+    } else {
+      paymentStatus = 'paid';
+      amountPaid = totals.total_cents;
+    }
+
     const saleNumber = nextSaleNumber(db);
 
     const saleResult = db
@@ -109,7 +208,7 @@ function createSale(db, payload) {
         saleNumber,
         customerId,
         sellerId,
-        paymentMethod,
+        storedPaymentMethod,
         paymentStatus,
         totals.subtotal_cents,
         totals.discount_cents,
@@ -144,26 +243,25 @@ function createSale(db, payload) {
       }
     }
 
-    if (paymentMethod === 'credit') {
-      let account = db.prepare('SELECT * FROM credit_accounts WHERE customer_id = ?').get(customerId);
-      if (!account) {
-        db.prepare('INSERT INTO credit_accounts (customer_id, balance_cents) VALUES (?, 0)').run(customerId);
-        account = { balance_cents: 0 };
-      }
-
-      const newBalance = account.balance_cents + totals.total_cents;
-      db.prepare(
-        `UPDATE credit_accounts SET balance_cents = ?, updated_at = datetime('now', 'localtime') WHERE customer_id = ?`
-      ).run(newBalance, customerId);
-
-      db.prepare(
-        `INSERT INTO credit_ledger (
-          customer_id, sale_id, entry_type, amount_cents, payment_method, balance_after_cents, notes, created_by
-        ) VALUES (?, ?, 'charge', ?, NULL, ?, ?, ?)`
-      ).run(customerId, saleId, totals.total_cents, newBalance, notes, sellerId);
+    if (creditCents > 0) {
+      chargeCustomerCredit(db, {
+        customerId,
+        saleId,
+        amountCents: creditCents,
+        notes,
+        sellerId,
+      });
     }
 
-    return { saleId, saleNumber, ...totals, payment_status: paymentStatus };
+    return {
+      saleId,
+      saleNumber,
+      ...totals,
+      payment_status: paymentStatus,
+      amount_paid_cents: amountPaid,
+      change_cents: changeCents,
+      credit_cents: creditCents,
+    };
   });
 
   return tx();
@@ -220,6 +318,7 @@ function registerCreditPayment(db, { customerId, amountCents, paymentMethod, use
 module.exports = {
   assertCreditSaleAllowed,
   buildSaleTotals,
+  calcCashSettlement,
   nextSaleNumber,
   createSale,
   registerCreditPayment,

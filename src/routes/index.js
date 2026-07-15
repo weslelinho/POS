@@ -379,7 +379,7 @@ function createRouter(db) {
 
   router.post('/sales', requireSellerOrAdmin, (req, res) => {
     try {
-      const { payment_method, customer_id, notes } = req.body;
+      const { payment_method, customer_id, notes, cash_received, remainder_as_credit } = req.body;
       let items = req.body.items;
 
       if (typeof items === 'string') {
@@ -389,21 +389,44 @@ function createRouter(db) {
         throw new Error('Itens da venda inválidos.');
       }
 
+      let amountReceivedCents = null;
+      if (payment_method === 'cash' && cash_received != null && String(cash_received).trim() !== '') {
+        const raw = String(cash_received).trim();
+        const normalized = raw.includes(',')
+          ? raw.replace(/\./g, '').replace(',', '.')
+          : raw;
+        const parsed = Number(normalized);
+        if (!Number.isFinite(parsed) || parsed < 0) {
+          throw new Error('Valor em dinheiro inválido.');
+        }
+        amountReceivedCents = Math.round(parsed * 100);
+      }
+
       const result = createSale(db, {
         customerId: customer_id ? Number(customer_id) : null,
         sellerId: req.session.user.id,
         paymentMethod: payment_method,
         items,
         notes: notes || null,
+        amountReceivedCents,
+        remainderAsCredit: remainder_as_credit === '1' || remainder_as_credit === 'on',
       });
 
-      const totalLabel = (Number(result.total_cents || 0) / 100).toLocaleString('pt-BR', {
-        style: 'currency',
-        currency: 'BRL',
-      });
-      req.session.flash = {
-        success: `Venda ${result.saleNumber} registrada. Total: ${totalLabel}`,
-      };
+      const formatBrl = (cents) =>
+        (Number(cents || 0) / 100).toLocaleString('pt-BR', {
+          style: 'currency',
+          currency: 'BRL',
+        });
+
+      let success = `Venda ${result.saleNumber} registrada. Total: ${formatBrl(result.total_cents)}`;
+      if (result.change_cents > 0) {
+        success += ` · Troco: ${formatBrl(result.change_cents)}`;
+      }
+      if (result.credit_cents > 0) {
+        success += ` · Fiado: ${formatBrl(result.credit_cents)}`;
+      }
+
+      req.session.flash = { success };
       return res.redirect('/sales/new');
     } catch (err) {
       console.error('[POST /sales]', err);
