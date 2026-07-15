@@ -353,67 +353,62 @@ function createRouter(db) {
   });
 
   // ---- PDV / Nova venda ----
+  function loadSaleFormData() {
+    return {
+      products: db.prepare('SELECT * FROM products WHERE active = 1 ORDER BY name').all(),
+      members: db
+        .prepare(`SELECT * FROM customers WHERE active = 1 AND customer_type = 'member' ORDER BY name`)
+        .all(),
+      externals: db
+        .prepare(`SELECT * FROM customers WHERE active = 1 AND customer_type = 'external' ORDER BY name`)
+        .all(),
+    };
+  }
+
   router.get('/sales/new', requireSellerOrAdmin, (req, res) => {
-    const products = db.prepare('SELECT * FROM products WHERE active = 1 ORDER BY name').all();
-    const members = db
-      .prepare(`SELECT * FROM customers WHERE active = 1 AND customer_type = 'member' ORDER BY name`)
-      .all();
-    const externals = db
-      .prepare(`SELECT * FROM customers WHERE active = 1 AND customer_type = 'external' ORDER BY name`)
-      .all();
+    const flash = req.session.flash || {};
+    delete req.session.flash;
 
     res.render('sales/new', {
       title: 'Nova venda',
-      products,
-      members,
-      externals,
-      error: null,
-      success: null,
+      ...loadSaleFormData(),
+      error: flash.error || null,
+      success: flash.success || null,
     });
   });
 
   router.post('/sales', requireSellerOrAdmin, (req, res) => {
-    const products = db.prepare('SELECT * FROM products WHERE active = 1 ORDER BY name').all();
-    const members = db
-      .prepare(`SELECT * FROM customers WHERE active = 1 AND customer_type = 'member' ORDER BY name`)
-      .all();
-    const externals = db
-      .prepare(`SELECT * FROM customers WHERE active = 1 AND customer_type = 'external' ORDER BY name`)
-      .all();
-
     try {
       const { payment_method, customer_id, notes } = req.body;
       let items = req.body.items;
 
       if (typeof items === 'string') {
-        items = JSON.parse(items);
+        items = items.trim() ? JSON.parse(items) : [];
+      }
+      if (!Array.isArray(items)) {
+        throw new Error('Itens da venda inválidos.');
       }
 
       const result = createSale(db, {
         customerId: customer_id ? Number(customer_id) : null,
         sellerId: req.session.user.id,
         paymentMethod: payment_method,
-        items: items || [],
+        items,
         notes: notes || null,
       });
 
-      res.render('sales/new', {
-        title: 'Nova venda',
-        products,
-        members,
-        externals,
-        error: null,
-        success: `Venda ${result.saleNumber} registrada. Total: R$ ${(result.total_cents / 100).toFixed(2)}`,
+      const totalLabel = (Number(result.total_cents || 0) / 100).toLocaleString('pt-BR', {
+        style: 'currency',
+        currency: 'BRL',
       });
+      req.session.flash = {
+        success: `Venda ${result.saleNumber} registrada. Total: ${totalLabel}`,
+      };
+      return res.redirect('/sales/new');
     } catch (err) {
-      res.status(400).render('sales/new', {
-        title: 'Nova venda',
-        products,
-        members,
-        externals,
-        error: err.message,
-        success: null,
-      });
+      console.error('[POST /sales]', err);
+      req.session.flash = { error: err.message || 'Não foi possível registrar a venda.' };
+      return res.redirect('/sales/new');
     }
   });
 

@@ -72,12 +72,32 @@ function createSale(db, payload) {
     assertCreditSaleAllowed(customer);
   }
 
-  const totals = buildSaleTotals(items, discountCents);
-  const paymentStatus = paymentMethod === 'credit' ? 'credit' : 'paid';
-  const amountPaid = paymentMethod === 'credit' ? 0 : totals.total_cents;
-  const saleNumber = nextSaleNumber(db);
-
   const tx = db.transaction(() => {
+    // Resolve preços e estoque no servidor (o front envia só product_id + quantity)
+    const resolvedItems = [];
+    for (const item of items) {
+      const product = db.prepare('SELECT * FROM products WHERE id = ? AND active = 1').get(item.product_id);
+      if (!product) throw new Error(`Produto ${item.product_id} indisponível.`);
+
+      const qty = Number(item.quantity);
+      if (!qty || qty < 1) throw new Error('Quantidade inválida.');
+
+      if (product.stock_qty !== null && product.stock_qty < qty) {
+        throw new Error(`Estoque insuficiente para ${product.name}.`);
+      }
+
+      resolvedItems.push({
+        product,
+        quantity: qty,
+        unit_price_cents: product.price_cents,
+      });
+    }
+
+    const totals = buildSaleTotals(resolvedItems, discountCents);
+    const paymentStatus = paymentMethod === 'credit' ? 'credit' : 'paid';
+    const amountPaid = paymentMethod === 'credit' ? 0 : totals.total_cents;
+    const saleNumber = nextSaleNumber(db);
+
     const saleResult = db
       .prepare(
         `INSERT INTO sales (
@@ -105,23 +125,20 @@ function createSale(db, payload) {
       ) VALUES (?, ?, ?, ?, ?, ?)`
     );
 
-    for (const item of items) {
-      const product = db.prepare('SELECT * FROM products WHERE id = ? AND active = 1').get(item.product_id);
-      if (!product) throw new Error(`Produto ${item.product_id} indisponível.`);
-
-      const qty = Number(item.quantity);
-      if (!qty || qty < 1) throw new Error('Quantidade inválida.');
-
-      if (product.stock_qty !== null && product.stock_qty < qty) {
-        throw new Error(`Estoque insuficiente para ${product.name}.`);
-      }
-
-      const unit = product.price_cents;
-      insertItem.run(saleId, product.id, product.name, unit, qty, unit * qty);
+    for (const row of resolvedItems) {
+      const { product, quantity, unit_price_cents } = row;
+      insertItem.run(
+        saleId,
+        product.id,
+        product.name,
+        unit_price_cents,
+        quantity,
+        unit_price_cents * quantity
+      );
 
       if (product.stock_qty !== null) {
         db.prepare('UPDATE products SET stock_qty = stock_qty - ?, updated_at = datetime(\'now\', \'localtime\') WHERE id = ?').run(
-          qty,
+          quantity,
           product.id
         );
       }

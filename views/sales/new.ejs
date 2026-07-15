@@ -15,6 +15,9 @@
         </button>
         <% }) %>
       </div>
+      <% if (!products.length) { %>
+        <p class="muted">Nenhum produto ativo. Cadastre produtos antes de vender.</p>
+      <% } %>
       <table id="cart">
         <thead>
           <tr><th>Produto</th><th>Qtd</th><th>Total</th><th></th></tr>
@@ -52,7 +55,7 @@
         <textarea name="notes"></textarea>
       </label>
       <input type="hidden" name="items" id="items-json" value="[]" />
-      <button class="btn primary" type="submit">Finalizar venda</button>
+      <button class="btn primary" id="btn-finish" type="submit">Finalizar venda</button>
     </div>
   </form>
 </section>
@@ -61,47 +64,86 @@
   const tbody = document.querySelector('#cart tbody');
   const totalEl = document.querySelector('#cart-total');
   const itemsInput = document.querySelector('#items-json');
+  const form = document.querySelector('#sale-form');
+  const finishBtn = document.querySelector('#btn-finish');
 
   function money(cents) {
-    return (cents / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+    return (Number(cents) / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+  }
+
+  function escapeHtml(text) {
+    return String(text)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+
+  function syncItems() {
+    const items = [];
+    let total = 0;
+    for (const [id, row] of cart) {
+      items.push({ product_id: Number(id), quantity: row.qty });
+      total += row.price * row.qty;
+    }
+    itemsInput.value = JSON.stringify(items);
+    totalEl.textContent = money(total);
+    return items;
   }
 
   function render() {
     tbody.innerHTML = '';
-    let total = 0;
-    const items = [];
     for (const [id, row] of cart) {
       const line = row.price * row.qty;
-      total += line;
-      items.push({ product_id: Number(id), quantity: row.qty });
       const tr = document.createElement('tr');
-      tr.innerHTML = `<td>${row.name}</td>
+      tr.innerHTML = `<td>${escapeHtml(row.name)}</td>
         <td><input type="number" min="1" value="${row.qty}" data-id="${id}" class="qty" /></td>
         <td>${money(line)}</td>
         <td><button type="button" data-remove="${id}" class="btn ghost">✕</button></td>`;
       tbody.appendChild(tr);
     }
-    totalEl.textContent = money(total);
-    itemsInput.value = JSON.stringify(items);
+    syncItems();
   }
 
   document.querySelectorAll('.product-chip').forEach((btn) => {
     btn.addEventListener('click', () => {
       const id = btn.dataset.id;
-      const current = cart.get(id) || { name: btn.dataset.name, price: Number(btn.dataset.price), qty: 0 };
+      const current = cart.get(id) || {
+        name: btn.dataset.name,
+        price: Number(btn.dataset.price),
+        qty: 0,
+      };
       current.qty += 1;
       cart.set(id, current);
       render();
     });
   });
 
+  tbody.addEventListener('input', (e) => {
+    if (!e.target.classList.contains('qty')) return;
+    const id = e.target.dataset.id;
+    const row = cart.get(id);
+    if (!row) return;
+    row.qty = Math.max(1, Number(e.target.value) || 1);
+    cart.set(id, row);
+    syncItems();
+  });
+
   tbody.addEventListener('change', (e) => {
-    if (e.target.classList.contains('qty')) {
-      const id = e.target.dataset.id;
-      const row = cart.get(id);
-      row.qty = Math.max(1, Number(e.target.value) || 1);
-      cart.set(id, row);
-      render();
+    if (!e.target.classList.contains('qty')) return;
+    const id = e.target.dataset.id;
+    const row = cart.get(id);
+    if (!row) return;
+    row.qty = Math.max(1, Number(e.target.value) || 1);
+    e.target.value = row.qty;
+    cart.set(id, row);
+    render();
+  });
+
+  tbody.addEventListener('keydown', (e) => {
+    if (e.target.classList.contains('qty') && e.key === 'Enter') {
+      e.preventDefault();
+      e.target.blur();
     }
   });
 
@@ -113,7 +155,8 @@
     }
   });
 
-  document.querySelector('#sale-form').addEventListener('submit', (e) => {
+  form.addEventListener('submit', (e) => {
+    syncItems();
     if (cart.size === 0) {
       e.preventDefault();
       alert('Adicione ao menos um produto.');
@@ -124,7 +167,10 @@
     if (method === 'credit' && !customer) {
       e.preventDefault();
       alert('Selecione o membro para venda fiado.');
+      return;
     }
+    finishBtn.disabled = true;
+    finishBtn.textContent = 'Registrando…';
   });
 </script>
 <%- include('../partials/layout-bottom') %>
