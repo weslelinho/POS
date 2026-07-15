@@ -309,6 +309,49 @@ function createRouter(db) {
     }
   });
 
+  router.post('/products/:id', requireAdmin, (req, res) => {
+    const productId = Number(req.params.id);
+    const products = () => db.prepare('SELECT * FROM products ORDER BY name COLLATE NOCASE').all();
+
+    try {
+      const existing = db.prepare('SELECT * FROM products WHERE id = ?').get(productId);
+      if (!existing) throw new Error('Produto não encontrado.');
+
+      const { name, description, price, category, stock_qty, active } = req.body;
+      if (!name?.trim()) throw new Error('Nome é obrigatório.');
+      const priceCents = Math.round(Number(String(price).replace(',', '.')) * 100);
+      if (Number.isNaN(priceCents) || priceCents < 0) throw new Error('Preço inválido.');
+
+      const stock = stock_qty === '' || stock_qty == null ? null : Number(stock_qty);
+      const isActive = active === '0' || active === 0 ? 0 : 1;
+
+      db.prepare(
+        `UPDATE products
+         SET name = ?, description = ?, price_cents = ?, category = ?, stock_qty = ?,
+             active = ?, updated_at = datetime('now', 'localtime')
+         WHERE id = ?`
+      ).run(
+        name.trim(),
+        description || null,
+        priceCents,
+        category || null,
+        stock,
+        isActive,
+        productId
+      );
+
+      res.redirect('/products');
+    } catch (err) {
+      res.status(400).render('products/index', {
+        title: 'Produtos',
+        products: products(),
+        editError: err.message,
+        editProductId: productId,
+        editProduct: { id: productId, ...req.body },
+      });
+    }
+  });
+
   // ---- PDV / Nova venda ----
   router.get('/sales/new', requireSellerOrAdmin, (req, res) => {
     const products = db.prepare('SELECT * FROM products WHERE active = 1 ORDER BY name').all();

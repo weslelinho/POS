@@ -14,6 +14,7 @@
         <th>Preço</th>
         <th>Estoque</th>
         <th>Status</th>
+        <% if (currentUser.role === 'admin') { %><th></th><% } %>
       </tr>
     </thead>
     <tbody>
@@ -24,9 +25,125 @@
         <td><%= formatMoney(p.price_cents) %></td>
         <td><%= p.stock_qty == null ? '∞' : p.stock_qty %></td>
         <td><%= p.active ? 'Ativo' : 'Inativo' %></td>
+        <% if (currentUser.role === 'admin') { %>
+        <td>
+          <button
+            type="button"
+            class="btn"
+            data-edit-product
+            data-id="<%= p.id %>"
+            data-name="<%= p.name %>"
+            data-description="<%= p.description || '' %>"
+            data-price="<%= (Number(p.price_cents || 0) / 100).toFixed(2).replace('.', ',') %>"
+            data-category="<%= p.category || '' %>"
+            data-stock-qty="<%= p.stock_qty == null ? '' : p.stock_qty %>"
+            data-active="<%= p.active ? 1 : 0 %>"
+          >Editar</button>
+        </td>
+        <% } %>
       </tr>
       <% }) %>
     </tbody>
   </table>
 </section>
+
+<% if (currentUser.role === 'admin') { %>
+<dialog id="edit-product-modal" class="modal">
+  <form method="post" action="/products/0" class="card-form modal-form" id="edit-product-form">
+    <div class="modal-head">
+      <h2>Editar produto</h2>
+      <button type="button" class="btn ghost" data-close-modal aria-label="Fechar">×</button>
+    </div>
+    <% if (typeof editError !== 'undefined' && editError) { %><div class="alert error"><%= editError %></div><% } %>
+    <label>Nome *
+      <input name="name" id="edit-name" required />
+    </label>
+    <label>Descrição
+      <textarea name="description" id="edit-description"></textarea>
+    </label>
+    <label>Preço (R$) *
+      <input name="price" id="edit-price" required placeholder="15,00" />
+    </label>
+    <label>Categoria
+      <input name="category" id="edit-category" placeholder="Lanche, Bebida..." />
+    </label>
+    <label>Estoque (vazio = ilimitado)
+      <input name="stock_qty" id="edit-stock-qty" type="number" min="0" />
+    </label>
+    <label>Status
+      <select name="active" id="edit-active">
+        <option value="1">Ativo</option>
+        <option value="0">Inativo</option>
+      </select>
+    </label>
+    <div class="modal-actions">
+      <button type="button" class="btn ghost" data-close-modal>Cancelar</button>
+      <button class="btn primary" type="submit">Salvar</button>
+    </div>
+  </form>
+</dialog>
+
+<script>
+  (function () {
+    const modal = document.getElementById('edit-product-modal');
+    const form = document.getElementById('edit-product-form');
+    if (!modal || !form) return;
+
+    function fillForm(data) {
+      form.action = '/products/' + data.id;
+      document.getElementById('edit-name').value = data.name || '';
+      document.getElementById('edit-description').value = data.description || '';
+      document.getElementById('edit-price').value = data.price || '';
+      document.getElementById('edit-category').value = data.category || '';
+      document.getElementById('edit-stock-qty').value = data.stockQty ?? '';
+      document.getElementById('edit-active').value = String(data.active ?? 1);
+    }
+
+    function openModal(data) {
+      fillForm(data);
+      if (typeof modal.showModal === 'function') modal.showModal();
+      else modal.setAttribute('open', '');
+    }
+
+    function closeModal() {
+      if (typeof modal.close === 'function') modal.close();
+      else modal.removeAttribute('open');
+    }
+
+    document.querySelectorAll('[data-edit-product]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        openModal({
+          id: btn.dataset.id,
+          name: btn.dataset.name,
+          description: btn.dataset.description,
+          price: btn.dataset.price,
+          category: btn.dataset.category,
+          stockQty: btn.dataset.stockQty,
+          active: btn.dataset.active,
+        });
+      });
+    });
+
+    document.querySelectorAll('[data-close-modal]').forEach((btn) => {
+      btn.addEventListener('click', closeModal);
+    });
+
+    modal.addEventListener('click', (event) => {
+      if (event.target === modal) closeModal();
+    });
+
+    <% if (typeof editError !== 'undefined' && editError && typeof editProductId !== 'undefined' && editProductId) { %>
+    openModal({
+      id: <%= JSON.stringify(String(editProductId)) %>,
+      name: <%= JSON.stringify((typeof editProduct !== 'undefined' && editProduct?.name) || '') %>,
+      description: <%= JSON.stringify((typeof editProduct !== 'undefined' && editProduct?.description) || '') %>,
+      price: <%= JSON.stringify((typeof editProduct !== 'undefined' && editProduct?.price) || '') %>,
+      category: <%= JSON.stringify((typeof editProduct !== 'undefined' && editProduct?.category) || '') %>,
+      stockQty: <%= JSON.stringify((typeof editProduct !== 'undefined' && editProduct?.stock_qty) ?? '') %>,
+      active: <%= JSON.stringify((typeof editProduct !== 'undefined' && editProduct?.active) ?? 1) %>,
+    });
+    <% } %>
+  })();
+</script>
+<% } %>
 <%- include('../partials/layout-bottom') %>
