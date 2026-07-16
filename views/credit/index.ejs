@@ -7,20 +7,22 @@
         <th>Membro</th>
         <th>Apelido</th>
         <th>Telefone</th>
-        <th>Saldo</th>
+        <% if (currentUser.role === 'admin') { %><th>Saldo</th><% } %>
         <th></th>
       </tr>
     </thead>
     <tbody>
       <% if (!accounts.length) { %>
-        <tr><td colspan="5">Nenhum fiado em aberto.</td></tr>
+        <tr><td colspan="<%= currentUser.role === 'admin' ? 5 : 4 %>">Nenhum fiado em aberto.</td></tr>
       <% } %>
       <% accounts.forEach(a => { %>
       <tr>
         <td><%= a.name %></td>
         <td><%= a.club_nickname || '—' %></td>
         <td><%= a.phone || '—' %></td>
-        <td><%= formatMoney(a.balance_cents) %></td>
+        <% if (currentUser.role === 'admin') { %>
+          <td><%= formatMoney(a.balance_cents) %></td>
+        <% } %>
         <td><a class="btn" href="/credit/<%= a.customer_id %>">Detalhe / quitar</a></td>
       </tr>
       <% }) %>
