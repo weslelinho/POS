@@ -1,0 +1,164 @@
+<%- include('../partials/layout-top') %>
+<section>
+  <div class="page-head">
+    <h1>Caixa</h1>
+    <a class="btn" href="/dashboard">Painel</a>
+  </div>
+
+  <p class="muted">
+    Controle de dinheiro físico fora das vendas: fundo de troco na abertura, suprimento e sangria durante o turno.
+  </p>
+
+  <% if (error) { %><div class="alert error"><%= error %></div><% } %>
+  <% if (success) { %><div class="alert ok"><%= success %></div><% } %>
+
+  <% if (!summary) { %>
+  <form method="post" action="/cash/open" class="card-form">
+    <h2>Abrir caixa</h2>
+    <p class="muted" style="margin:0">Informe o valor em dinheiro colocado na gaveta para troco.</p>
+    <label>Fundo de troco (R$) *
+      <input name="opening_float" required placeholder="0,00" value="0,00" />
+    </label>
+    <label>Observações
+      <textarea name="notes" placeholder="Ex.: abertura do evento"></textarea>
+    </label>
+    <button class="btn primary" type="submit">Abrir caixa</button>
+  </form>
+  <% } else { %>
+  <% const t = summary.totals; const s = summary.session; %>
+  <div class="stats">
+    <div class="stat">
+      <span class="label">Status</span>
+      <strong>Aberto</strong>
+      <small>desde <%= s.opened_at %> · <%= s.opened_by_name %></small>
+    </div>
+    <div class="stat">
+      <span class="label">Saldo esperado</span>
+      <strong><%= formatMoney(t.expected_cents) %></strong>
+      <small>o que deve haver na gaveta</small>
+    </div>
+    <div class="stat">
+      <span class="label">Fundo de troco</span>
+      <strong><%= formatMoney(t.opening_float_cents) %></strong>
+    </div>
+    <div class="stat">
+      <span class="label">Sangrias</span>
+      <strong><%= formatMoney(t.bleed_cents) %></strong>
+    </div>
+  </div>
+
+  <div class="stats">
+    <div class="stat">
+      <span class="label">Vendas em dinheiro</span>
+      <strong><%= formatMoney(t.sales_cash_cents) %></strong>
+    </div>
+    <div class="stat">
+      <span class="label">Fiado quitado (dinheiro)</span>
+      <strong><%= formatMoney(t.credit_cash_cents) %></strong>
+    </div>
+    <div class="stat">
+      <span class="label">Suprimentos</span>
+      <strong><%= formatMoney(t.supply_cents) %></strong>
+    </div>
+  </div>
+
+  <div class="cash-actions">
+    <form method="post" action="/cash/bleed" class="card-form">
+      <h2>Sangria</h2>
+      <p class="muted" style="margin:0">Retire dinheiro da gaveta para o cofre (evita valores altos no caixa).</p>
+      <label>Valor (R$) *
+        <input name="amount" required placeholder="0,00" />
+      </label>
+      <label>Observações
+        <textarea name="notes" placeholder="Ex.: sangria para cofre"></textarea>
+      </label>
+      <button class="btn primary" type="submit">Registrar sangria</button>
+    </form>
+
+    <form method="post" action="/cash/supply" class="card-form">
+      <h2>Suprimento</h2>
+      <p class="muted" style="margin:0">Coloque mais dinheiro na gaveta (reforço de troco).</p>
+      <label>Valor (R$) *
+        <input name="amount" required placeholder="0,00" />
+      </label>
+      <label>Observações
+        <textarea name="notes" placeholder="Ex.: reforço de troco"></textarea>
+      </label>
+      <button class="btn" type="submit">Registrar suprimento</button>
+    </form>
+
+    <form method="post" action="/cash/close" class="card-form">
+      <h2>Fechar caixa</h2>
+      <p class="muted" style="margin:0">Opcional: conte o dinheiro na gaveta e registre a diferença.</p>
+      <label>Valor contado (R$)
+        <input name="counted_amount" placeholder="deixe em branco se não contar" />
+      </label>
+      <label>Observações
+        <textarea name="notes"></textarea>
+      </label>
+      <button class="btn" type="submit">Fechar caixa</button>
+    </form>
+  </div>
+
+  <h2>Movimentos do turno</h2>
+  <% if (!summary.movements.length) { %>
+  <p class="muted">Nenhuma sangria ou suprimento neste turno.</p>
+  <% } else { %>
+  <table>
+    <thead>
+      <tr>
+        <th>Data</th>
+        <th>Tipo</th>
+        <th>Valor</th>
+        <th>Usuário</th>
+        <th>Obs.</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% summary.movements.forEach(m => { %>
+      <tr>
+        <td><%= m.created_at %></td>
+        <td><%= m.movement_type === 'bleed' ? 'Sangria' : 'Suprimento' %></td>
+        <td><%= formatMoney(m.amount_cents) %></td>
+        <td><%= m.created_by_name %></td>
+        <td><%= m.notes || '—' %></td>
+      </tr>
+      <% }) %>
+    </tbody>
+  </table>
+  <% } %>
+  <% } %>
+
+  <h2 style="margin-top:2rem">Histórico recente</h2>
+  <% if (!recent.length) { %>
+  <p class="muted">Nenhuma sessão registrada ainda.</p>
+  <% } else { %>
+  <table>
+    <thead>
+      <tr>
+        <th>Abertura</th>
+        <th>Fechamento</th>
+        <th>Fundo</th>
+        <th>Esperado</th>
+        <th>Contado</th>
+        <th>Status</th>
+        <th>Aberto por</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% recent.forEach(r => { %>
+      <tr>
+        <td><%= r.opened_at %></td>
+        <td><%= r.closed_at || '—' %></td>
+        <td><%= formatMoney(r.opening_float_cents) %></td>
+        <td><%= r.expected_cents != null ? formatMoney(r.expected_cents) : '—' %></td>
+        <td><%= r.closing_counted_cents != null ? formatMoney(r.closing_counted_cents) : '—' %></td>
+        <td><%= r.status === 'open' ? 'Aberto' : 'Fechado' %></td>
+        <td><%= r.opened_by_name %></td>
+      </tr>
+      <% }) %>
+    </tbody>
+  </table>
+  <% } %>
+</section>
+<%- include('../partials/layout-bottom') %>

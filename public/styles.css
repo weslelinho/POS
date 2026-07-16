@@ -308,6 +308,17 @@ th { color: var(--muted); font-weight: 600; background: rgba(0,0,0,0.35); }
   flex-shrink: 0;
 }
 
+.cash-actions {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 1rem;
+  margin: 1.25rem 0 1.75rem;
+}
+
+.cash-actions .card-form {
+  max-width: none;
+}
+
 .sale-grid {
   display: grid;
   grid-template-columns: 1.4fr 1fr;

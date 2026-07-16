@@ -2,6 +2,31 @@ const express = require('express');
 const bcrypt = require('bcryptjs');
 const { requireAuth, requireAdmin, requireSellerOrAdmin } = require('../middleware/auth');
 const { createSale, registerCreditPayment } = require('../services/saleService');
+const {
+  getOpenSession,
+  getSessionSummary,
+  openSession,
+  addSupply,
+  addBleed,
+  closeSession,
+  listRecentSessions,
+} = require('../services/cashService');
+
+/** Converte valor BR (ex.: 10,50 ou 1.234,56) em centavos. */
+function parseMoneyToCents(raw, { allowZero = false } = {}) {
+  const text = String(raw ?? '').trim();
+  if (!text) throw new Error('Informe um valor.');
+  const normalized = text.includes(',')
+    ? text.replace(/\./g, '').replace(',', '.')
+    : text;
+  const parsed = Number(normalized);
+  if (!Number.isFinite(parsed) || parsed < 0) {
+    throw new Error('Valor inválido.');
+  }
+  const cents = Math.round(parsed * 100);
+  if (!allowZero && cents <= 0) throw new Error('Informe um valor maior que zero.');
+  return cents;
+}
 
 function loadCreditLedgerWithItems(db, customerId) {
   const ledger = db
@@ -90,6 +115,9 @@ function createRouter(db) {
   });
 
   router.get('/dashboard', requireAuth, (req, res) => {
+    const openCash = getOpenSession(db);
+    const cashSummary = openCash ? getSessionSummary(db, openCash) : null;
+
     const stats = {
       salesToday: db
         .prepare(
@@ -102,6 +130,8 @@ function createRouter(db) {
         .get(),
       products: db.prepare(`SELECT COUNT(*) AS c FROM products WHERE active = 1`).get(),
       members: db.prepare(`SELECT COUNT(*) AS c FROM customers WHERE customer_type = 'member' AND active = 1`).get(),
+      cashOpen: !!openCash,
+      cashExpected: cashSummary?.totals.expected_cents ?? null,
     };
 
     res.render('dashboard', { title: 'Painel', stats });
@@ -553,6 +583,110 @@ function createRouter(db) {
         error: err.message,
         success: null,
       });
+    }
+  });
+
+  // ---- Caixa (fundo de troco / sangria / suprimento) ----
+  function renderCashPage(res, { error = null, success = null, status = 200 } = {}) {
+    const open = getOpenSession(db);
+    const summary = open ? getSessionSummary(db, open) : null;
+    const recent = listRecentSessions(db, 15);
+
+    return res.status(status).render('cash/index', {
+      title: 'Caixa',
+      summary,
+      recent,
+      error,
+      success,
+    });
+  }
+
+  router.get('/cash', requireSellerOrAdmin, (req, res) => {
+    const flash = req.session.flash || {};
+    delete req.session.flash;
+    return renderCashPage(res, {
+      error: flash.error || null,
+      success: flash.success || null,
+    });
+  });
+
+  router.post('/cash/open', requireSellerOrAdmin, (req, res) => {
+    try {
+      const openingFloatCents = parseMoneyToCents(req.body.opening_float, { allowZero: true });
+      openSession(db, {
+        userId: req.session.user.id,
+        openingFloatCents,
+        notes: req.body.notes?.trim() || null,
+      });
+      req.session.flash = { success: 'Caixa aberto com fundo de troco.' };
+      return res.redirect('/cash');
+    } catch (err) {
+      return renderCashPage(res, { error: err.message, status: 400 });
+    }
+  });
+
+  router.post('/cash/supply', requireSellerOrAdmin, (req, res) => {
+    try {
+      const amountCents = parseMoneyToCents(req.body.amount);
+      addSupply(db, {
+        userId: req.session.user.id,
+        amountCents,
+        notes: req.body.notes?.trim() || null,
+      });
+      req.session.flash = { success: 'Suprimento registrado.' };
+      return res.redirect('/cash');
+    } catch (err) {
+      return renderCashPage(res, { error: err.message, status: 400 });
+    }
+  });
+
+  router.post('/cash/bleed', requireSellerOrAdmin, (req, res) => {
+    try {
+      const amountCents = parseMoneyToCents(req.body.amount);
+      addBleed(db, {
+        userId: req.session.user.id,
+        amountCents,
+        notes: req.body.notes?.trim() || null,
+      });
+      req.session.flash = { success: 'Sangria registrada.' };
+      return res.redirect('/cash');
+    } catch (err) {
+      return renderCashPage(res, { error: err.message, status: 400 });
+    }
+  });
+
+  router.post('/cash/close', requireSellerOrAdmin, (req, res) => {
+    try {
+      let countedCents = null;
+      if (req.body.counted_amount != null && String(req.body.counted_amount).trim() !== '') {
+        countedCents = parseMoneyToCents(req.body.counted_amount, { allowZero: true });
+      }
+
+      const closed = closeSession(db, {
+        userId: req.session.user.id,
+        countedCents,
+        notes: req.body.notes?.trim() || null,
+      });
+
+      const formatBrl = (cents) =>
+        (Number(cents || 0) / 100).toLocaleString('pt-BR', {
+          style: 'currency',
+          currency: 'BRL',
+        });
+
+      let success = `Caixa fechado. Esperado: ${formatBrl(closed.totals.expected_cents)}`;
+      if (closed.totals.closing_counted_cents != null) {
+        success += ` · Contado: ${formatBrl(closed.totals.closing_counted_cents)}`;
+        const diff = closed.totals.difference_cents;
+        if (diff !== 0) {
+          success += ` · Diferença: ${formatBrl(diff)}`;
+        }
+      }
+
+      req.session.flash = { success };
+      return res.redirect('/cash');
+    } catch (err) {
+      return renderCashPage(res, { error: err.message, status: 400 });
     }
   });
 

@@ -19,9 +19,20 @@
       <span class="label">Membros</span>
       <strong><%= stats.members.c %></strong>
     </div>
+    <div class="stat">
+      <span class="label">Caixa</span>
+      <% if (stats.cashOpen) { %>
+      <strong>Aberto</strong>
+      <small>esperado <%= formatMoney(stats.cashExpected) %></small>
+      <% } else { %>
+      <strong>Fechado</strong>
+      <small>abra com fundo de troco</small>
+      <% } %>
+    </div>
   </div>
   <div class="actions">
     <a class="btn primary" href="/sales/new">Nova venda</a>
+    <a class="btn" href="/cash">Caixa</a>
     <a class="btn" href="/credit">Ver fiado</a>
   </div>
 </section>
