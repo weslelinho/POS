@@ -693,16 +693,20 @@ function createRouter(db) {
 
   // ---- Fiado ----
   router.get('/credit', requireSellerOrAdmin, (req, res) => {
-    const accounts = db
-      .prepare(
-        `SELECT ca.*, c.name, c.club_nickname, c.phone
+    const q = String(req.query.q || '').trim();
+    let sql = `SELECT ca.*, c.name, c.club_nickname, c.phone
          FROM credit_accounts ca
          JOIN customers c ON c.id = ca.customer_id
-         WHERE ca.balance_cents > 0
-         ORDER BY ca.balance_cents DESC`
-      )
-      .all();
-    res.render('credit/index', { title: 'Fiado em aberto', accounts, error: null, success: null });
+         WHERE ca.balance_cents > 0`;
+    const params = [];
+    if (q) {
+      sql += ` AND (c.name LIKE ? COLLATE NOCASE OR IFNULL(c.club_nickname, '') LIKE ? COLLATE NOCASE)`;
+      const like = `%${q}%`;
+      params.push(like, like);
+    }
+    sql += ` ORDER BY ca.balance_cents DESC`;
+    const accounts = db.prepare(sql).all(...params);
+    res.render('credit/index', { title: 'Fiado em aberto', accounts, q, error: null, success: null });
   });
 
   router.get('/credit/:customerId', requireSellerOrAdmin, (req, res) => {

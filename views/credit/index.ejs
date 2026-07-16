@@ -1,6 +1,15 @@
 <%- include('../partials/layout-top') %>
 <section>
   <h1>Fiado em aberto</h1>
+
+  <form method="get" action="/credit" class="filter-bar">
+    <label>Buscar cliente
+      <input type="search" name="q" value="<%= q || '' %>" placeholder="Nome ou apelido" autocomplete="off" />
+    </label>
+    <button class="btn primary" type="submit">Filtrar</button>
+    <% if (q) { %><a class="btn" href="/credit">Limpar</a><% } %>
+  </form>
+
   <table>
     <thead>
       <tr>
@@ -13,7 +22,7 @@
     </thead>
     <tbody>
       <% if (!accounts.length) { %>
-        <tr><td colspan="<%= currentUser.role === 'admin' ? 5 : 4 %>">Nenhum fiado em aberto.</td></tr>
+        <tr><td colspan="<%= currentUser.role === 'admin' ? 5 : 4 %>"><%= q ? 'Nenhum cliente encontrado com esse nome.' : 'Nenhum fiado em aberto.' %></td></tr>
       <% } %>
       <% accounts.forEach(a => { %>
       <tr>
