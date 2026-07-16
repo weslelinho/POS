@@ -12,6 +12,7 @@ const {
   listRecentSessions,
 } = require('../services/cashService');
 const { getSalesReport } = require('../services/salesReportService');
+const { getSalesByRecentOpeningDays } = require('../services/adminDashboardService');
 const { writeSalesReportPdf } = require('../services/pdfSalesReport');
 const { writeCreditReportPdf } = require('../services/pdfCreditReport');
 const {
@@ -143,6 +144,20 @@ function createRouter(db) {
     };
 
     res.render('dashboard', { title: 'Painel', stats });
+  });
+
+  // ---- Admin dashboard ----
+  router.get('/admin/dashboard', requireAdmin, (req, res) => {
+    const daysRaw = Number(req.query.days);
+    const limit = [7, 14, 30].includes(daysRaw) ? daysRaw : 14;
+    const { points, totals } = getSalesByRecentOpeningDays(db, { limit });
+
+    res.render('admin/dashboard', {
+      title: 'Dashboard Admin',
+      points,
+      totals,
+      limit,
+    });
   });
 
   // ---- Bases (chapters) ----

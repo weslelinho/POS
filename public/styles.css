@@ -554,3 +554,35 @@ th { color: var(--muted); font-weight: 600; background: rgba(0,0,0,0.35); }
 @media (max-width: 800px) {
   .sale-grid { grid-template-columns: 1fr; }
 }
+
+.chart-panel {
+  background: rgba(20, 20, 20, 0.92);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 1.25rem;
+  margin: 1.25rem 0;
+}
+
+.chart-panel h2 {
+  margin: 0 0 1rem;
+  font-size: 1.1rem;
+  color: var(--accent);
+}
+
+.chart-wrap {
+  position: relative;
+  height: 340px;
+  width: 100%;
+}
+
+.badge-open {
+  display: inline-block;
+  margin-left: 0.45rem;
+  padding: 0.15rem 0.45rem;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #0a0a0a;
+  background: var(--accent);
+  vertical-align: middle;
+}

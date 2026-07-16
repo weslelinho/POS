@@ -34,6 +34,9 @@
     <a class="btn primary" href="/sales/new">Nova venda</a>
     <a class="btn" href="/cash">Caixa</a>
     <a class="btn" href="/credit">Ver fiado</a>
+    <% if (currentUser && currentUser.role === 'admin') { %>
+    <a class="btn" href="/admin/dashboard">Dashboard admin</a>
+    <% } %>
   </div>
 </section>
 <%- include('partials/layout-bottom') %>
