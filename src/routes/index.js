@@ -83,16 +83,21 @@ function loadCreditLedgerWithItems(db, customerId) {
   }));
 }
 
+/** Destino pós-login: admin vai ao painel; demais perfis vão direto à venda. */
+function homePathFor(user) {
+  return user?.role === 'admin' ? '/dashboard' : '/sales/new';
+}
+
 function createRouter(db) {
   const router = express.Router();
 
   router.get('/', (req, res) => {
-    if (req.session?.user) return res.redirect('/dashboard');
+    if (req.session?.user) return res.redirect(homePathFor(req.session.user));
     return res.redirect('/login');
   });
 
   router.get('/login', (req, res) => {
-    if (req.session?.user) return res.redirect('/dashboard');
+    if (req.session?.user) return res.redirect(homePathFor(req.session.user));
     res.render('login', { title: 'Login', error: null });
   });
 
@@ -116,7 +121,7 @@ function createRouter(db) {
       role: user.role,
     };
 
-    return res.redirect('/dashboard');
+    return res.redirect(homePathFor(req.session.user));
   });
 
   router.post('/logout', requireAuth, (req, res) => {
