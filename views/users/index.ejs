@@ -12,6 +12,7 @@
         <th>Perfil</th>
         <th>Status</th>
         <th>Criado em</th>
+        <th></th>
       </tr>
     </thead>
     <tbody>
@@ -22,9 +23,115 @@
         <td><%= u.role === 'admin' ? 'Admin' : 'Vendedor' %></td>
         <td><%= u.active ? 'Ativo' : 'Inativo' %></td>
         <td><%= u.created_at %></td>
+        <td>
+          <button
+            type="button"
+            class="btn"
+            data-edit-user
+            data-id="<%= u.id %>"
+            data-name="<%= u.name %>"
+            data-username="<%= u.username %>"
+            data-role="<%= u.role %>"
+            data-active="<%= u.active ? 1 : 0 %>"
+          >Editar</button>
+        </td>
       </tr>
       <% }) %>
     </tbody>
   </table>
 </section>
+
+<dialog id="edit-user-modal" class="modal">
+  <form method="post" action="/users/0" class="card-form modal-form" id="edit-user-form">
+    <div class="modal-head">
+      <h2>Editar usuário</h2>
+      <button type="button" class="btn ghost" data-close-modal aria-label="Fechar">×</button>
+    </div>
+    <% if (typeof editError !== 'undefined' && editError) { %><div class="alert error"><%= editError %></div><% } %>
+    <label>Nome *
+      <input name="name" id="edit-name" required />
+    </label>
+    <label>Usuário (login) *
+      <input name="username" id="edit-username" required />
+    </label>
+    <label>Nova senha
+      <input type="password" name="password" id="edit-password" autocomplete="new-password" />
+      <small class="field-hint">Deixe em branco para manter a senha atual.</small>
+    </label>
+    <label>Perfil *
+      <select name="role" id="edit-role" required>
+        <option value="seller">Vendedor</option>
+        <option value="admin">Admin</option>
+      </select>
+    </label>
+    <label>Status
+      <select name="active" id="edit-active">
+        <option value="1">Ativo</option>
+        <option value="0">Inativo</option>
+      </select>
+    </label>
+    <div class="modal-actions">
+      <button type="button" class="btn ghost" data-close-modal>Cancelar</button>
+      <button class="btn primary" type="submit">Salvar</button>
+    </div>
+  </form>
+</dialog>
+
+<script>
+  (function () {
+    const modal = document.getElementById('edit-user-modal');
+    const form = document.getElementById('edit-user-form');
+    if (!modal || !form) return;
+
+    function fillForm(data) {
+      form.action = '/users/' + data.id;
+      document.getElementById('edit-name').value = data.name || '';
+      document.getElementById('edit-username').value = data.username || '';
+      document.getElementById('edit-password').value = '';
+      document.getElementById('edit-role').value = data.role || 'seller';
+      document.getElementById('edit-active').value = String(data.active ?? 1);
+    }
+
+    function openModal(data) {
+      fillForm(data);
+      if (typeof modal.showModal === 'function') modal.showModal();
+      else modal.setAttribute('open', '');
+    }
+
+    function closeModal() {
+      if (typeof modal.close === 'function') modal.close();
+      else modal.removeAttribute('open');
+    }
+
+    document.querySelectorAll('[data-edit-user]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        openModal({
+          id: btn.dataset.id,
+          name: btn.dataset.name,
+          username: btn.dataset.username,
+          role: btn.dataset.role,
+          active: btn.dataset.active,
+        });
+      });
+    });
+
+    document.querySelectorAll('[data-close-modal]').forEach((btn) => {
+      btn.addEventListener('click', closeModal);
+    });
+
+    modal.addEventListener('click', (event) => {
+      if (event.target === modal) closeModal();
+    });
+
+    <% if (typeof editError !== 'undefined' && editError && typeof editUserId !== 'undefined' && editUserId) { %>
+    openModal({
+      id: <%= JSON.stringify(String(editUserId)) %>,
+      name: <%= JSON.stringify((typeof editUser !== 'undefined' && editUser?.name) || '') %>,
+      username: <%= JSON.stringify((typeof editUser !== 'undefined' && editUser?.username) || '') %>,
+      role: <%= JSON.stringify((typeof editUser !== 'undefined' && editUser?.role) || 'seller') %>,
+      active: <%= JSON.stringify((typeof editUser !== 'undefined' && editUser?.active) ?? 1) %>,
+    });
+    <% } %>
+  })();
+</script>
 <%- include('../partials/layout-bottom') %>

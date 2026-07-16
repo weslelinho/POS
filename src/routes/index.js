@@ -324,11 +324,27 @@ function createRouter(db) {
   });
 
   // ---- Usuários (admin) ----
-  router.get('/users', requireAdmin, (req, res) => {
-    const users = db
+  function listUsers() {
+    return db
       .prepare('SELECT id, name, username, role, active, created_at FROM users ORDER BY name')
       .all();
-    res.render('users/index', { title: 'Usuários', users });
+  }
+
+  function countActiveAdmins(excludeId = null) {
+    if (excludeId == null) {
+      return db
+        .prepare(`SELECT COUNT(*) AS total FROM users WHERE role = 'admin' AND active = 1`)
+        .get().total;
+    }
+    return db
+      .prepare(
+        `SELECT COUNT(*) AS total FROM users WHERE role = 'admin' AND active = 1 AND id != ?`
+      )
+      .get(excludeId).total;
+  }
+
+  router.get('/users', requireAdmin, (req, res) => {
+    res.render('users/index', { title: 'Usuários', users: listUsers() });
   });
 
   router.get('/users/new', requireAdmin, (req, res) => {
@@ -354,6 +370,68 @@ function createRouter(db) {
         title: 'Novo usuário',
         userForm: req.body,
         error: err.message.includes('UNIQUE') ? 'Nome de usuário já existe.' : err.message,
+      });
+    }
+  });
+
+  router.post('/users/:id', requireAdmin, (req, res) => {
+    const userId = Number(req.params.id);
+    const { name, username, password, role, active } = req.body;
+
+    try {
+      const existing = db.prepare('SELECT * FROM users WHERE id = ?').get(userId);
+      if (!existing) throw new Error('Usuário não encontrado.');
+
+      if (!name?.trim() || !username?.trim()) {
+        throw new Error('Preencha nome e usuário.');
+      }
+      if (!['admin', 'seller'].includes(role)) throw new Error('Perfil inválido.');
+
+      const isActive = active === '0' || active === 0 ? 0 : 1;
+      const wasActiveAdmin = existing.role === 'admin' && existing.active === 1;
+      const willBeActiveAdmin = role === 'admin' && isActive === 1;
+
+      if (wasActiveAdmin && !willBeActiveAdmin && countActiveAdmins(userId) === 0) {
+        throw new Error('É necessário manter ao menos um administrador ativo.');
+      }
+
+      if (password) {
+        const hash = bcrypt.hashSync(password, 10);
+        db.prepare(
+          `UPDATE users
+           SET name = ?, username = ?, password_hash = ?, role = ?, active = ?,
+               updated_at = datetime('now', 'localtime')
+           WHERE id = ?`
+        ).run(name.trim(), username.trim(), hash, role, isActive, userId);
+      } else {
+        db.prepare(
+          `UPDATE users
+           SET name = ?, username = ?, role = ?, active = ?,
+               updated_at = datetime('now', 'localtime')
+           WHERE id = ?`
+        ).run(name.trim(), username.trim(), role, isActive, userId);
+      }
+
+      if (req.session?.user?.id === userId) {
+        if (!isActive) {
+          return req.session.destroy(() => res.redirect('/login'));
+        }
+        req.session.user = {
+          id: userId,
+          name: name.trim(),
+          username: username.trim(),
+          role,
+        };
+      }
+
+      res.redirect('/users');
+    } catch (err) {
+      res.status(400).render('users/index', {
+        title: 'Usuários',
+        users: listUsers(),
+        editError: err.message.includes('UNIQUE') ? 'Nome de usuário já existe.' : err.message,
+        editUserId: userId,
+        editUser: { id: userId, ...req.body },
       });
     }
   });
