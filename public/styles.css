@@ -137,6 +137,44 @@ th, td {
 
 th { color: var(--muted); font-weight: 600; background: rgba(0,0,0,0.35); }
 
+.ledger-items-row > td {
+  padding: 0;
+  background: rgba(0, 0, 0, 0.22);
+  border-bottom: 1px solid var(--line);
+}
+
+.charge-items {
+  padding: 0.75rem 0.9rem 1rem;
+  display: grid;
+  gap: 0.65rem;
+}
+
+.charge-items-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
+  align-items: baseline;
+  justify-content: space-between;
+}
+
+.items-table {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  overflow: hidden;
+  background: rgba(20, 20, 20, 0.55);
+}
+
+.items-table th,
+.items-table td {
+  padding: 0.45rem 0.65rem;
+  font-size: 0.88rem;
+}
+
+.items-table th {
+  background: rgba(0, 0, 0, 0.28);
+}
+
 .stats {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));

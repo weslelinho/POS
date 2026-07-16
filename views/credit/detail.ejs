@@ -29,7 +29,7 @@
   <% } %>
 
   <h2>Extrato</h2>
-  <table>
+  <table class="ledger-table">
     <thead>
       <tr>
         <th>Data</th>
@@ -42,7 +42,7 @@
     </thead>
     <tbody>
       <% ledger.forEach(l => { %>
-      <tr>
+      <tr class="ledger-row">
         <td><%= l.created_at %></td>
         <td>
           <% if (l.entry_type === 'charge') { %>Cobrança
@@ -54,6 +54,53 @@
         <td><%= formatMoney(l.balance_after_cents) %></td>
         <td><%= l.notes || '—' %></td>
       </tr>
+      <% if (l.entry_type === 'charge' && l.items && l.items.length) { %>
+      <tr class="ledger-items-row">
+        <td colspan="6">
+          <div class="charge-items">
+            <div class="charge-items-head">
+              <strong>Itens da cobrança<% if (l.sale?.sale_number) { %> — <%= l.sale.sale_number %><% } %></strong>
+              <% if (l.sale) { %>
+              <span class="muted">
+                Total venda: <%= formatMoney(l.sale.total_cents) %>
+                <% if (l.sale.discount_cents > 0) { %> · Desconto: <%= formatMoney(l.sale.discount_cents) %><% } %>
+                <% if (l.sale.amount_paid_cents > 0) { %> · Pago na hora: <%= formatMoney(l.sale.amount_paid_cents) %><% } %>
+                · Fiado: <%= formatMoney(l.amount_cents) %>
+              </span>
+              <% } %>
+            </div>
+            <table class="items-table">
+              <thead>
+                <tr>
+                  <th>Produto</th>
+                  <th>Qtd</th>
+                  <th>Preço unit.</th>
+                  <th>Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                <% l.items.forEach(item => { %>
+                <tr>
+                  <td><%= item.product_name %></td>
+                  <td><%= item.quantity %></td>
+                  <td><%= formatMoney(item.unit_price_cents) %></td>
+                  <td><%= formatMoney(item.line_total_cents) %></td>
+                </tr>
+                <% }) %>
+              </tbody>
+            </table>
+          </div>
+        </td>
+      </tr>
+      <% } else if (l.entry_type === 'charge' && l.sale_id) { %>
+      <tr class="ledger-items-row">
+        <td colspan="6">
+          <div class="charge-items">
+            <span class="muted">Nenhum item encontrado para esta cobrança.</span>
+          </div>
+        </td>
+      </tr>
+      <% } %>
       <% }) %>
     </tbody>
   </table>

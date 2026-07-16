@@ -3,6 +3,52 @@ const bcrypt = require('bcryptjs');
 const { requireAuth, requireAdmin, requireSellerOrAdmin } = require('../middleware/auth');
 const { createSale, registerCreditPayment } = require('../services/saleService');
 
+function loadCreditLedgerWithItems(db, customerId) {
+  const ledger = db
+    .prepare(
+      `SELECT * FROM credit_ledger WHERE customer_id = ? ORDER BY created_at DESC LIMIT 50`
+    )
+    .all(customerId);
+
+  const saleIds = [...new Set(ledger.map((row) => row.sale_id).filter(Boolean))];
+  const salesById = {};
+  const itemsBySaleId = {};
+
+  if (saleIds.length) {
+    const placeholders = saleIds.map(() => '?').join(',');
+    const sales = db
+      .prepare(
+        `SELECT id, sale_number, subtotal_cents, discount_cents, total_cents,
+                amount_paid_cents, payment_status, payment_method, sold_at
+         FROM sales WHERE id IN (${placeholders})`
+      )
+      .all(...saleIds);
+    for (const sale of sales) {
+      salesById[sale.id] = sale;
+      itemsBySaleId[sale.id] = [];
+    }
+
+    const items = db
+      .prepare(
+        `SELECT sale_id, product_name, unit_price_cents, quantity, line_total_cents
+         FROM sale_items
+         WHERE sale_id IN (${placeholders})
+         ORDER BY id ASC`
+      )
+      .all(...saleIds);
+    for (const item of items) {
+      if (!itemsBySaleId[item.sale_id]) itemsBySaleId[item.sale_id] = [];
+      itemsBySaleId[item.sale_id].push(item);
+    }
+  }
+
+  return ledger.map((row) => ({
+    ...row,
+    sale: row.sale_id ? salesById[row.sale_id] || null : null,
+    items: row.sale_id ? itemsBySaleId[row.sale_id] || [] : [],
+  }));
+}
+
 function createRouter(db) {
   const router = express.Router();
 
@@ -468,11 +514,7 @@ function createRouter(db) {
     const customerId = Number(req.params.customerId);
     const customer = db.prepare('SELECT * FROM customers WHERE id = ?').get(customerId);
     const account = db.prepare('SELECT * FROM credit_accounts WHERE customer_id = ?').get(customerId);
-    const ledger = db
-      .prepare(
-        `SELECT * FROM credit_ledger WHERE customer_id = ? ORDER BY created_at DESC LIMIT 50`
-      )
-      .all(customerId);
+    const ledger = loadCreditLedgerWithItems(db, customerId);
 
     if (!customer) return res.status(404).render('error', { title: 'Não encontrado', message: 'Cliente não encontrado.' });
 
@@ -501,9 +543,7 @@ function createRouter(db) {
     } catch (err) {
       const customer = db.prepare('SELECT * FROM customers WHERE id = ?').get(customerId);
       const account = db.prepare('SELECT * FROM credit_accounts WHERE customer_id = ?').get(customerId);
-      const ledger = db
-        .prepare(`SELECT * FROM credit_ledger WHERE customer_id = ? ORDER BY created_at DESC LIMIT 50`)
-        .all(customerId);
+      const ledger = loadCreditLedgerWithItems(db, customerId);
 
       res.status(400).render('credit/detail', {
         title: `Fiado — ${customer?.name || ''}`,
