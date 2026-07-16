@@ -44,6 +44,13 @@ function migrate(db) {
 
     CREATE INDEX IF NOT EXISTS idx_cash_movements_session ON cash_movements(session_id);
   `);
+
+  // Produtos: imagem para exibição no PDV
+  const productCols = db.prepare(`PRAGMA table_info(products)`).all();
+  const hasImagePath = productCols.some((c) => c.name === 'image_path');
+  if (!hasImagePath) {
+    db.exec(`ALTER TABLE products ADD COLUMN image_path TEXT`);
+  }
 }
 
 module.exports = { migrate };

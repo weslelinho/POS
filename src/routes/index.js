@@ -13,6 +13,11 @@ const {
 } = require('../services/cashService');
 const { getSalesReport } = require('../services/salesReportService');
 const { writeSalesReportPdf } = require('../services/pdfSalesReport');
+const {
+  upload,
+  finalizeProductImage,
+  discardTempUpload,
+} = require('../services/productImage');
 
 /** Converte valor BR (ex.: 10,50 ou 1.234,56) em centavos. */
 function parseMoneyToCents(raw, { allowZero = false } = {}) {
@@ -354,16 +359,51 @@ function createRouter(db) {
   });
 
   // ---- Produtos ----
+  function listProducts() {
+    return db.prepare('SELECT * FROM products ORDER BY name COLLATE NOCASE').all();
+  }
+
+  function handleProductImageUpload(req, res, next) {
+    upload.single('image')(req, res, (err) => {
+      if (!err) return next();
+      const message =
+        err.code === 'LIMIT_FILE_SIZE'
+          ? 'A imagem deve ter no máximo 2 MB.'
+          : err.message || 'Falha no envio da imagem.';
+
+      if (req.params?.id) {
+        const productId = Number(req.params.id);
+        const row = db.prepare('SELECT image_path FROM products WHERE id = ?').get(productId);
+        return res.status(400).render('products/index', {
+          title: 'Produtos',
+          products: listProducts(),
+          editError: message,
+          editProductId: productId,
+          editProduct: {
+            id: productId,
+            ...(req.body || {}),
+            image_path: row?.image_path || '',
+          },
+        });
+      }
+
+      return res.status(400).render('products/form', {
+        title: 'Novo produto',
+        product: req.body || {},
+        error: message,
+      });
+    });
+  }
+
   router.get('/products', requireSellerOrAdmin, (req, res) => {
-    const products = db.prepare('SELECT * FROM products ORDER BY name COLLATE NOCASE').all();
-    res.render('products/index', { title: 'Produtos', products });
+    res.render('products/index', { title: 'Produtos', products: listProducts() });
   });
 
   router.get('/products/new', requireAdmin, (req, res) => {
     res.render('products/form', { title: 'Novo produto', product: null, error: null });
   });
 
-  router.post('/products', requireAdmin, (req, res) => {
+  router.post('/products', requireAdmin, handleProductImageUpload, (req, res) => {
     try {
       const { name, description, price, category, stock_qty } = req.body;
       if (!name?.trim()) throw new Error('Nome é obrigatório.');
@@ -372,13 +412,26 @@ function createRouter(db) {
 
       const stock = stock_qty === '' || stock_qty == null ? null : Number(stock_qty);
 
-      db.prepare(
-        `INSERT INTO products (name, description, price_cents, category, stock_qty)
-         VALUES (?, ?, ?, ?, ?)`
-      ).run(name.trim(), description || null, priceCents, category || null, stock);
+      const result = db
+        .prepare(
+          `INSERT INTO products (name, description, price_cents, category, stock_qty)
+           VALUES (?, ?, ?, ?, ?)`
+        )
+        .run(name.trim(), description || null, priceCents, category || null, stock);
+
+      const productId = Number(result.lastInsertRowid);
+      if (req.file) {
+        const imagePath = finalizeProductImage(productId, req.file, null);
+        db.prepare(
+          `UPDATE products
+           SET image_path = ?, updated_at = datetime('now', 'localtime')
+           WHERE id = ?`
+        ).run(imagePath, productId);
+      }
 
       res.redirect('/products');
     } catch (err) {
+      discardTempUpload(req.file);
       res.status(400).render('products/form', {
         title: 'Novo produto',
         product: req.body,
@@ -387,13 +440,14 @@ function createRouter(db) {
     }
   });
 
-  router.post('/products/:id', requireAdmin, (req, res) => {
+  router.post('/products/:id', requireAdmin, handleProductImageUpload, (req, res) => {
     const productId = Number(req.params.id);
-    const products = () => db.prepare('SELECT * FROM products ORDER BY name COLLATE NOCASE').all();
+    let existingImagePath = '';
 
     try {
       const existing = db.prepare('SELECT * FROM products WHERE id = ?').get(productId);
       if (!existing) throw new Error('Produto não encontrado.');
+      existingImagePath = existing.image_path || '';
 
       const { name, description, price, category, stock_qty, active } = req.body;
       if (!name?.trim()) throw new Error('Nome é obrigatório.');
@@ -402,11 +456,14 @@ function createRouter(db) {
 
       const stock = stock_qty === '' || stock_qty == null ? null : Number(stock_qty);
       const isActive = active === '0' || active === 0 ? 0 : 1;
+      const imagePath = req.file
+        ? finalizeProductImage(productId, req.file, existing.image_path)
+        : existing.image_path;
 
       db.prepare(
         `UPDATE products
          SET name = ?, description = ?, price_cents = ?, category = ?, stock_qty = ?,
-             active = ?, updated_at = datetime('now', 'localtime')
+             image_path = ?, active = ?, updated_at = datetime('now', 'localtime')
          WHERE id = ?`
       ).run(
         name.trim(),
@@ -414,18 +471,24 @@ function createRouter(db) {
         priceCents,
         category || null,
         stock,
+        imagePath || null,
         isActive,
         productId
       );
 
       res.redirect('/products');
     } catch (err) {
+      discardTempUpload(req.file);
+      if (!existingImagePath) {
+        const row = db.prepare('SELECT image_path FROM products WHERE id = ?').get(productId);
+        existingImagePath = row?.image_path || '';
+      }
       res.status(400).render('products/index', {
         title: 'Produtos',
-        products: products(),
+        products: listProducts(),
         editError: err.message,
         editProductId: productId,
-        editProduct: { id: productId, ...req.body },
+        editProduct: { id: productId, ...req.body, image_path: existingImagePath },
       });
     }
   });

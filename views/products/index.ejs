@@ -9,6 +9,7 @@
   <table>
     <thead>
       <tr>
+        <th></th>
         <th>Nome</th>
         <th>Categoria</th>
         <th>Preço</th>
@@ -20,6 +21,13 @@
     <tbody>
       <% products.forEach(p => { %>
       <tr>
+        <td class="product-thumb-cell">
+          <% if (p.image_path) { %>
+            <img class="product-thumb" src="/public/<%= p.image_path %>" alt="" />
+          <% } else { %>
+            <span class="product-thumb product-thumb-empty" aria-hidden="true"><%= (p.name || '?').charAt(0).toUpperCase() %></span>
+          <% } %>
+        </td>
         <td><%= p.name %></td>
         <td><%= p.category || '—' %></td>
         <td><%= formatMoney(p.price_cents) %></td>
@@ -38,6 +46,7 @@
             data-category="<%= p.category || '' %>"
             data-stock-qty="<%= p.stock_qty == null ? '' : p.stock_qty %>"
             data-active="<%= p.active ? 1 : 0 %>"
+            data-image-path="<%= p.image_path || '' %>"
           >Editar</button>
         </td>
         <% } %>
@@ -49,7 +58,7 @@
 
 <% if (currentUser.role === 'admin') { %>
 <dialog id="edit-product-modal" class="modal">
-  <form method="post" action="/products/0" class="card-form modal-form" id="edit-product-form">
+  <form method="post" action="/products/0" class="card-form modal-form" id="edit-product-form" enctype="multipart/form-data">
     <div class="modal-head">
       <h2>Editar produto</h2>
       <button type="button" class="btn ghost" data-close-modal aria-label="Fechar">×</button>
@@ -70,6 +79,11 @@
     <label>Estoque (vazio = ilimitado)
       <input name="stock_qty" id="edit-stock-qty" type="number" min="0" />
     </label>
+    <label>Imagem do produto
+      <div id="edit-image-preview" class="product-image-preview" hidden></div>
+      <input name="image" id="edit-image" type="file" accept="image/jpeg,image/png,image/webp,image/gif" />
+      <span class="field-hint">Deixe em branco para manter a imagem atual. JPG, PNG, WEBP ou GIF · máx. 2 MB.</span>
+    </label>
     <label>Status
       <select name="active" id="edit-active">
         <option value="1">Ativo</option>
@@ -89,6 +103,20 @@
     const form = document.getElementById('edit-product-form');
     if (!modal || !form) return;
 
+    const preview = document.getElementById('edit-image-preview');
+    const imageInput = document.getElementById('edit-image');
+
+    function setPreview(imagePath) {
+      if (!preview) return;
+      if (imagePath) {
+        preview.hidden = false;
+        preview.innerHTML = '<img src="/public/' + imagePath + '" alt="Imagem atual" />';
+      } else {
+        preview.hidden = true;
+        preview.innerHTML = '';
+      }
+    }
+
     function fillForm(data) {
       form.action = '/products/' + data.id;
       document.getElementById('edit-name').value = data.name || '';
@@ -97,6 +125,8 @@
       document.getElementById('edit-category').value = data.category || '';
       document.getElementById('edit-stock-qty').value = data.stockQty ?? '';
       document.getElementById('edit-active').value = String(data.active ?? 1);
+      if (imageInput) imageInput.value = '';
+      setPreview(data.imagePath || '');
     }
 
     function openModal(data) {
@@ -120,6 +150,7 @@
           category: btn.dataset.category,
           stockQty: btn.dataset.stockQty,
           active: btn.dataset.active,
+          imagePath: btn.dataset.imagePath,
         });
       });
     });
@@ -141,6 +172,7 @@
       category: <%= JSON.stringify((typeof editProduct !== 'undefined' && editProduct?.category) || '') %>,
       stockQty: <%= JSON.stringify((typeof editProduct !== 'undefined' && editProduct?.stock_qty) ?? '') %>,
       active: <%= JSON.stringify((typeof editProduct !== 'undefined' && editProduct?.active) ?? 1) %>,
+      imagePath: <%= JSON.stringify((typeof editProduct !== 'undefined' && editProduct?.image_path) || '') %>,
     });
     <% } %>
   })();

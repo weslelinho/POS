@@ -9,9 +9,22 @@
       <h2>Itens</h2>
       <div class="product-list">
         <% products.forEach(p => { %>
-        <button type="button" class="product-chip" data-id="<%= p.id %>" data-name="<%= p.name %>" data-price="<%= p.price_cents %>">
-          <strong><%= p.name %></strong>
-          <span><%= formatMoney(p.price_cents) %></span>
+        <button
+          type="button"
+          class="product-card"
+          data-id="<%= p.id %>"
+          data-name="<%= p.name %>"
+          data-price="<%= p.price_cents %>"
+        >
+          <span class="product-card-media">
+            <% if (p.image_path) { %>
+              <img src="/public/<%= p.image_path %>" alt="" loading="lazy" />
+            <% } else { %>
+              <span class="product-card-placeholder" aria-hidden="true"><%= (p.name || '?').charAt(0).toUpperCase() %></span>
+            <% } %>
+          </span>
+          <strong class="product-card-name"><%= p.name %></strong>
+          <span class="product-card-price"><%= formatMoney(p.price_cents) %></span>
         </button>
         <% }) %>
       </div>
@@ -249,7 +262,7 @@
     syncItems();
   }
 
-  document.querySelectorAll('.product-chip').forEach((btn) => {
+  document.querySelectorAll('.product-card').forEach((btn) => {
     btn.addEventListener('click', () => {
       const id = btn.dataset.id;
       const current = cart.get(id) || {

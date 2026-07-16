@@ -2,7 +2,7 @@
 <section>
   <h1>Novo produto</h1>
   <% if (error) { %><div class="alert error"><%= error %></div><% } %>
-  <form method="post" action="/products" class="card-form">
+  <form method="post" action="/products" class="card-form" enctype="multipart/form-data">
     <label>Nome *
       <input name="name" required value="<%= product?.name || '' %>" />
     </label>
@@ -17,6 +17,10 @@
     </label>
     <label>Estoque (vazio = ilimitado)
       <input name="stock_qty" type="number" min="0" value="<%= product?.stock_qty ?? '' %>" />
+    </label>
+    <label>Imagem do produto
+      <input name="image" type="file" accept="image/jpeg,image/png,image/webp,image/gif" />
+      <span class="field-hint">JPG, PNG, WEBP ou GIF · máx. 2 MB. Aparece na tela de vendas.</span>
     </label>
     <button class="btn primary" type="submit">Salvar</button>
   </form>

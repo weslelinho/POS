@@ -65,6 +65,7 @@ CREATE TABLE IF NOT EXISTS products (
   price_cents INTEGER NOT NULL CHECK (price_cents >= 0),  -- valor em centavos
   category    TEXT,
   stock_qty   INTEGER,                         -- NULL = estoque ilimitado / não controlado
+  image_path  TEXT,                            -- relativo a public/ (ex.: img/products/1.jpg)
   active      INTEGER NOT NULL DEFAULT 1 CHECK (active IN (0, 1)),
   created_at  TEXT    NOT NULL DEFAULT (datetime('now', 'localtime')),
   updated_at  TEXT    NOT NULL DEFAULT (datetime('now', 'localtime'))
