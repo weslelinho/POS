@@ -173,13 +173,58 @@ th { color: var(--muted); font-weight: 600; background: rgba(0,0,0,0.35); }
 
 .auth .card-form { text-align: left; margin: 0 auto; }
 
-.cash-helper {
+.cash-helper,
+.pix-helper {
   display: grid;
   gap: 0.65rem;
   padding: 0.85rem;
   border: 1px solid var(--line);
   border-radius: 10px;
   background: rgba(0, 0, 0, 0.28);
+}
+
+.cash-helper[hidden],
+.pix-helper[hidden] {
+  display: none !important;
+}
+
+.pix-helper-title {
+  margin: 0;
+  color: var(--accent);
+  font-weight: 600;
+  font-size: 0.95rem;
+}
+
+.pix-qr {
+  display: block;
+  width: min(100%, 220px);
+  height: auto;
+  margin: 0 auto;
+  border-radius: 12px;
+  background: #000;
+}
+
+.pix-key-block {
+  display: grid;
+  gap: 0.4rem;
+  justify-items: start;
+}
+
+.pix-key-block code {
+  display: block;
+  width: 100%;
+  padding: 0.55rem 0.65rem;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: #0f0f0f;
+  color: var(--text);
+  font-size: 0.95rem;
+  word-break: break-all;
+}
+
+.pix-helper-hint {
+  margin: 0;
+  font-size: 0.82rem;
 }
 
 .cash-helper-hint {

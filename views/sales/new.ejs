@@ -73,6 +73,25 @@
         </p>
       </div>
 
+      <div id="pix-helper" class="pix-helper" hidden>
+        <p class="pix-helper-title">Pagamento via PIX</p>
+        <img
+          class="pix-qr"
+          src="/public/img/pix-qrcode.png"
+          alt="QR Code PIX — SCAN ME"
+          width="264"
+          height="312"
+        />
+        <div class="pix-key-block">
+          <span class="muted">Chave PIX</span>
+          <code id="pix-key-value">+5561996160566</code>
+          <button type="button" class="btn ghost" id="btn-copy-pix" data-pix-key="+5561996160566">
+            Copiar chave
+          </button>
+        </div>
+        <p class="muted pix-helper-hint">Mostre o QR ao cliente ou copie a chave para colar no app do banco.</p>
+      </div>
+
       <label>Observações
         <textarea name="notes"></textarea>
       </label>
@@ -91,10 +110,12 @@
   const paymentMethodEl = document.querySelector('#payment_method');
   const customerEl = document.querySelector('#customer_id');
   const cashHelper = document.querySelector('#cash-helper');
+  const pixHelper = document.querySelector('#pix-helper');
   const cashReceivedEl = document.querySelector('#cash_received');
   const cashFeedback = document.querySelector('#cash-feedback');
   const remainderWrap = document.querySelector('#remainder-credit-wrap');
   const remainderCreditEl = document.querySelector('#remainder_as_credit');
+  const btnCopyPix = document.querySelector('#btn-copy-pix');
 
   let cartTotalCents = 0;
 
@@ -127,15 +148,21 @@
     return Boolean(opt && opt.dataset.member === '1');
   }
 
-  function updateCashHelper() {
-    const isCash = paymentMethodEl.value === 'cash';
+  function updatePaymentHelpers() {
+    const method = paymentMethodEl.value;
+    const isCash = method === 'cash';
+    const isPix = method === 'pix';
+
     cashHelper.hidden = !isCash;
+    pixHelper.hidden = !isPix;
+
     if (!isCash) {
       cashFeedback.hidden = true;
       remainderWrap.hidden = true;
       remainderCreditEl.checked = false;
-      return;
     }
+
+    if (!isCash) return;
 
     const received = parseMoneyToCents(cashReceivedEl.value);
     if (received === null) {
@@ -204,7 +231,7 @@
     itemsInput.value = JSON.stringify(items);
     cartTotalCents = total;
     totalEl.textContent = money(total);
-    updateCashHelper();
+    updatePaymentHelpers();
     return items;
   }
 
@@ -272,10 +299,22 @@
     }
   });
 
-  paymentMethodEl.addEventListener('change', updateCashHelper);
-  customerEl.addEventListener('change', updateCashHelper);
-  cashReceivedEl.addEventListener('input', updateCashHelper);
-  remainderCreditEl.addEventListener('change', updateCashHelper);
+  paymentMethodEl.addEventListener('change', updatePaymentHelpers);
+  customerEl.addEventListener('change', updatePaymentHelpers);
+  cashReceivedEl.addEventListener('input', updatePaymentHelpers);
+  remainderCreditEl.addEventListener('change', updatePaymentHelpers);
+
+  btnCopyPix.addEventListener('click', async () => {
+    const key = btnCopyPix.dataset.pixKey || '';
+    try {
+      await navigator.clipboard.writeText(key);
+      const prev = btnCopyPix.textContent;
+      btnCopyPix.textContent = 'Copiada!';
+      setTimeout(() => { btnCopyPix.textContent = prev; }, 1500);
+    } catch {
+      window.prompt('Copie a chave PIX:', key);
+    }
+  });
 
   form.addEventListener('submit', (e) => {
     syncItems();
@@ -319,6 +358,6 @@
     finishBtn.textContent = 'Registrando…';
   });
 
-  updateCashHelper();
+  updatePaymentHelpers();
 </script>
 <%- include('../partials/layout-bottom') %>
