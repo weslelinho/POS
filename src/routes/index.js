@@ -13,6 +13,7 @@ const {
 } = require('../services/cashService');
 const { getSalesReport } = require('../services/salesReportService');
 const { writeSalesReportPdf } = require('../services/pdfSalesReport');
+const { writeCreditReportPdf } = require('../services/pdfCreditReport');
 const {
   upload,
   finalizeProductImage,
@@ -705,6 +706,29 @@ function createRouter(db) {
       error: null,
       success: null,
     });
+  });
+
+  router.get('/credit/:customerId/export.pdf', requireSellerOrAdmin, (req, res) => {
+    const customerId = Number(req.params.customerId);
+    const customer = db.prepare('SELECT * FROM customers WHERE id = ?').get(customerId);
+    if (!customer) {
+      return res.status(404).render('error', { title: 'Não encontrado', message: 'Cliente não encontrado.' });
+    }
+
+    const account = db.prepare('SELECT * FROM credit_accounts WHERE customer_id = ?').get(customerId);
+    const ledger = loadCreditLedgerWithItems(db, customerId);
+    const safeName = String(customer.name || 'cliente')
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-zA-Z0-9]+/g, '_')
+      .replace(/^_|_$/g, '')
+      .slice(0, 40) || 'cliente';
+    const filename = `fiado_${safeName}.pdf`;
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+
+    writeCreditReportPdf(res, { customer, account, ledger });
   });
 
   router.post('/credit/:customerId/pay', requireSellerOrAdmin, (req, res) => {

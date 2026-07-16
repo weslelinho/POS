@@ -2,7 +2,10 @@
 <section>
   <div class="page-head">
     <h1>Fiado — <%= customer.name %></h1>
-    <a class="btn" href="/credit">Voltar</a>
+    <div class="actions">
+      <a class="btn" href="/credit/<%= customer.id %>/export.pdf">Exportar PDF</a>
+      <a class="btn" href="/credit">Voltar</a>
+    </div>
   </div>
   <p>Saldo em aberto: <strong><%= formatMoney(account?.balance_cents || 0) %></strong></p>
 
