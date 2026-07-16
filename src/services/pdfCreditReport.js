@@ -3,6 +3,7 @@
  */
 
 const PDFDocument = require('pdfkit');
+const { CLUB_NAME, drawLetterhead } = require('./pdfLetterhead');
 
 function formatBrl(cents) {
   return (Number(cents || 0) / 100).toLocaleString('pt-BR', {
@@ -35,7 +36,7 @@ function writeCreditReportPdf(stream, { customer, account, ledger }) {
     size: 'A4',
     info: {
       Title: `Fiado — ${customer.name}`,
-      Author: 'POS Motoclube',
+      Author: CLUB_NAME,
     },
   });
 
@@ -43,8 +44,7 @@ function writeCreditReportPdf(stream, { customer, account, ledger }) {
 
   const balanceCents = account?.balance_cents || 0;
 
-  doc.fontSize(18).text('POS Motoclube', { align: 'left' });
-  doc.moveDown(0.3);
+  drawLetterhead(doc);
   doc.fontSize(14).text('Extrato de Fiado');
   doc.fontSize(10).fillColor('#444');
   doc.text(`Cliente: ${customer.name}`);
@@ -79,6 +79,7 @@ function writeCreditReportPdf(stream, { customer, account, ledger }) {
   function ensureSpace(needed) {
     if (doc.y + needed > pageBottom) {
       doc.addPage();
+      drawLetterhead(doc);
     }
   }
 
@@ -148,7 +149,7 @@ function writeCreditReportPdf(stream, { customer, account, ledger }) {
       for (const item of entry.items) {
         if (y > pageBottom - 20) {
           doc.addPage();
-          y = 48;
+          y = drawLetterhead(doc);
         }
         doc.fontSize(8);
         doc.text(item.product_name || '', col.product, y, { width: 250, ellipsis: true });

@@ -3,6 +3,7 @@
  */
 
 const PDFDocument = require('pdfkit');
+const { CLUB_NAME, drawLetterhead } = require('./pdfLetterhead');
 
 function formatBrl(cents) {
   return (Number(cents || 0) / 100).toLocaleString('pt-BR', {
@@ -41,7 +42,7 @@ function writeSalesReportPdf(stream, { period, sales, summary }) {
     size: 'A4',
     info: {
       Title: 'Relatório de Vendas',
-      Author: 'POS Motoclube',
+      Author: CLUB_NAME,
     },
   });
 
@@ -49,8 +50,7 @@ function writeSalesReportPdf(stream, { period, sales, summary }) {
 
   const periodLabel = formatPeriodLabel(period.fromDate, period.toDate);
 
-  doc.fontSize(18).text('POS Motoclube', { align: 'left' });
-  doc.moveDown(0.3);
+  drawLetterhead(doc);
   doc.fontSize(14).text('Relatório de Vendas');
   doc.fontSize(10).fillColor('#444').text(`Período: ${periodLabel}`);
   doc.text(`Gerado em: ${new Date().toLocaleString('pt-BR')}`);
@@ -109,7 +109,7 @@ function writeSalesReportPdf(stream, { period, sales, summary }) {
   for (const sale of sales) {
     if (y > 760) {
       doc.addPage();
-      y = 48;
+      y = drawLetterhead(doc);
       drawHeader();
     }
 
