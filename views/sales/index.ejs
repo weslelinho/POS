@@ -2,8 +2,44 @@
 <section>
   <div class="page-head">
     <h1>Vendas</h1>
-    <a class="btn primary" href="/sales/new">Nova venda</a>
+    <div class="actions">
+      <a class="btn" href="/sales/export.pdf?from=<%= fromDate %>&to=<%= toDate %>">Exportar PDF</a>
+      <a class="btn primary" href="/sales/new">Nova venda</a>
+    </div>
   </div>
+
+  <form method="get" action="/sales" class="filter-bar">
+    <label>De
+      <input type="date" name="from" value="<%= fromDate %>" required />
+    </label>
+    <label>Até
+      <input type="date" name="to" value="<%= toDate %>" required />
+    </label>
+    <button class="btn primary" type="submit">Filtrar</button>
+  </form>
+
+  <div class="stats">
+    <div class="stat">
+      <span class="label">PIX</span>
+      <strong><%= formatMoney(summary.pix_cents) %></strong>
+    </div>
+    <div class="stat">
+      <span class="label">Dinheiro</span>
+      <strong><%= formatMoney(summary.cash_cents) %></strong>
+    </div>
+    <div class="stat">
+      <span class="label">Fiado</span>
+      <strong><%= formatMoney(summary.credit_cents) %></strong>
+    </div>
+    <div class="stat">
+      <span class="label">Total · <%= summary.sales_count %> venda(s)</span>
+      <strong><%= formatMoney(summary.total_cents) %></strong>
+    </div>
+  </div>
+
+  <% if (!sales.length) { %>
+  <p class="muted">Nenhuma venda no período selecionado.</p>
+  <% } else { %>
   <table>
     <thead>
       <tr>
@@ -38,5 +74,6 @@
       <% }) %>
     </tbody>
   </table>
+  <% } %>
 </section>
 <%- include('../partials/layout-bottom') %>

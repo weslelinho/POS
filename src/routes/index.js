@@ -11,6 +11,8 @@ const {
   closeSession,
   listRecentSessions,
 } = require('../services/cashService');
+const { getSalesReport } = require('../services/salesReportService');
+const { writeSalesReportPdf } = require('../services/pdfSalesReport');
 
 /** Converte valor BR (ex.: 10,50 ou 1.234,56) em centavos. */
 function parseMoneyToCents(raw, { allowZero = false } = {}) {
@@ -512,18 +514,24 @@ function createRouter(db) {
   });
 
   router.get('/sales', requireSellerOrAdmin, (req, res) => {
-    const sales = db
-      .prepare(
-        `SELECT s.*, u.name AS seller_name, c.name AS customer_name
-         FROM sales s
-         JOIN users u ON u.id = s.seller_id
-         LEFT JOIN customers c ON c.id = s.customer_id
-         WHERE s.status = 'completed'
-         ORDER BY s.sold_at DESC
-         LIMIT 100`
-      )
-      .all();
-    res.render('sales/index', { title: 'Vendas', sales });
+    const report = getSalesReport(db, { from: req.query.from, to: req.query.to });
+    res.render('sales/index', {
+      title: 'Vendas',
+      sales: report.sales,
+      summary: report.summary,
+      fromDate: report.period.fromDate,
+      toDate: report.period.toDate,
+    });
+  });
+
+  router.get('/sales/export.pdf', requireSellerOrAdmin, (req, res) => {
+    const report = getSalesReport(db, { from: req.query.from, to: req.query.to });
+    const filename = `vendas_${report.period.fromDate}_${report.period.toDate}.pdf`;
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+
+    writeSalesReportPdf(res, report);
   });
 
   // ---- Fiado ----
