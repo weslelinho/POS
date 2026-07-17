@@ -20,6 +20,7 @@ const {
   finalizeProductImage,
   discardTempUpload,
 } = require('../services/productImage');
+const { logTransaction } = require('../services/transactionLog');
 
 /** Converte valor BR (ex.: 10,50 ou 1.234,56) em centavos. */
 function parseMoneyToCents(raw, { allowZero = false } = {}) {
@@ -652,6 +653,23 @@ function createRouter(db) {
         remainderAsCredit: remainder_as_credit === '1' || remainder_as_credit === 'on',
       });
 
+      logTransaction({
+        login: req.session.user.username,
+        type: 'sale',
+        details: {
+          saleId: result.saleId,
+          saleNumber: result.saleNumber,
+          customerId: customer_id ? Number(customer_id) : null,
+          paymentMethod: payment_method,
+          paymentStatus: result.payment_status,
+          totalCents: result.total_cents,
+          amountPaidCents: result.amount_paid_cents,
+          changeCents: result.change_cents,
+          creditCents: result.credit_cents,
+          itemsCount: items.length,
+        },
+      });
+
       const formatBrl = (cents) =>
         (Number(cents || 0) / 100).toLocaleString('pt-BR', {
           style: 'currency',
@@ -759,13 +777,26 @@ function createRouter(db) {
     const customerId = Number(req.params.customerId);
     try {
       const amountCents = Math.round(Number(String(req.body.amount).replace(',', '.')) * 100);
-      registerCreditPayment(db, {
+      const paymentResult = registerCreditPayment(db, {
         customerId,
         amountCents,
         paymentMethod: req.body.payment_method,
         userId: req.session.user.id,
         notes: req.body.notes || null,
       });
+
+      logTransaction({
+        login: req.session.user.username,
+        type: 'credit_payment',
+        details: {
+          customerId,
+          amountCents,
+          paymentMethod: req.body.payment_method,
+          balanceCents: paymentResult.balance_cents,
+          notes: req.body.notes || null,
+        },
+      });
+
       res.redirect(`/credit/${customerId}`);
     } catch (err) {
       const customer = db.prepare('SELECT * FROM customers WHERE id = ?').get(customerId);
@@ -810,11 +841,22 @@ function createRouter(db) {
   router.post('/cash/open', requireSellerOrAdmin, (req, res) => {
     try {
       const openingFloatCents = parseMoneyToCents(req.body.opening_float, { allowZero: true });
-      openSession(db, {
+      const session = openSession(db, {
         userId: req.session.user.id,
         openingFloatCents,
         notes: req.body.notes?.trim() || null,
       });
+
+      logTransaction({
+        login: req.session.user.username,
+        type: 'cash_open',
+        details: {
+          sessionId: session.id,
+          openingFloatCents,
+          notes: req.body.notes?.trim() || null,
+        },
+      });
+
       req.session.flash = { success: 'Caixa aberto com fundo de troco.' };
       return res.redirect('/cash');
     } catch (err) {
@@ -825,11 +867,23 @@ function createRouter(db) {
   router.post('/cash/supply', requireSellerOrAdmin, (req, res) => {
     try {
       const amountCents = parseMoneyToCents(req.body.amount);
-      addSupply(db, {
+      const movement = addSupply(db, {
         userId: req.session.user.id,
         amountCents,
         notes: req.body.notes?.trim() || null,
       });
+
+      logTransaction({
+        login: req.session.user.username,
+        type: 'cash_supply',
+        details: {
+          movementId: movement.id,
+          sessionId: movement.session_id,
+          amountCents,
+          notes: req.body.notes?.trim() || null,
+        },
+      });
+
       req.session.flash = { success: 'Suprimento registrado.' };
       return res.redirect('/cash');
     } catch (err) {
@@ -840,11 +894,23 @@ function createRouter(db) {
   router.post('/cash/bleed', requireSellerOrAdmin, (req, res) => {
     try {
       const amountCents = parseMoneyToCents(req.body.amount);
-      addBleed(db, {
+      const movement = addBleed(db, {
         userId: req.session.user.id,
         amountCents,
         notes: req.body.notes?.trim() || null,
       });
+
+      logTransaction({
+        login: req.session.user.username,
+        type: 'cash_bleed',
+        details: {
+          movementId: movement.id,
+          sessionId: movement.session_id,
+          amountCents,
+          notes: req.body.notes?.trim() || null,
+        },
+      });
+
       req.session.flash = { success: 'Sangria registrada.' };
       return res.redirect('/cash');
     } catch (err) {
@@ -863,6 +929,18 @@ function createRouter(db) {
         userId: req.session.user.id,
         countedCents,
         notes: req.body.notes?.trim() || null,
+      });
+
+      logTransaction({
+        login: req.session.user.username,
+        type: 'cash_close',
+        details: {
+          sessionId: closed.session.id,
+          expectedCents: closed.totals.expected_cents,
+          countedCents: closed.totals.closing_counted_cents,
+          differenceCents: closed.totals.difference_cents,
+          notes: req.body.notes?.trim() || null,
+        },
       });
 
       const formatBrl = (cents) =>
