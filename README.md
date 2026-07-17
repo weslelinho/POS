@@ -595,4 +595,7 @@ Sugestão: a cada 1–2 horas, ou após picos de movimento, copiar a pasta `data
 
 ## Licença
 
-Uso interno do evento / motoclube — `UNLICENSED` (privado).
+Software proprietário — todos os direitos reservados.
+
+Uso interno autorizado do evento / motoclube ECMC apenas. Ver o arquivo
+[`LICENSE`](./LICENSE) para os termos completos.
