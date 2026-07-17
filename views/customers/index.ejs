@@ -4,6 +4,24 @@
     <h1>Clientes</h1>
     <a class="btn primary" href="/customers/new">Novo cliente</a>
   </div>
+
+  <form method="get" action="/customers" class="filter-bar">
+    <label>Nome
+      <input type="search" name="q" value="<%= q || '' %>" placeholder="Nome ou apelido" autocomplete="off" />
+    </label>
+    <label>Base
+      <select name="base_id">
+        <option value="">Todas</option>
+        <option value="none" <%= baseId === 'none' ? 'selected' : '' %>>Sem base</option>
+        <% (bases || []).forEach(b => { %>
+          <option value="<%= b.id %>" <%= String(baseId) === String(b.id) ? 'selected' : '' %>><%= b.name %></option>
+        <% }) %>
+      </select>
+    </label>
+    <button class="btn primary" type="submit">Filtrar</button>
+    <% if (q || baseId) { %><a class="btn" href="/customers">Limpar</a><% } %>
+  </form>
+
   <table>
     <thead>
       <tr>

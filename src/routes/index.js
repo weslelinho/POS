@@ -204,15 +204,34 @@ function createRouter(db) {
       .all();
   }
 
-  function loadCustomers() {
-    return db
-      .prepare(
-        `SELECT c.*, b.name AS base_name
+  function loadCustomers({ q = '', baseId = '' } = {}) {
+    let sql = `SELECT c.*, b.name AS base_name
          FROM customers c
          LEFT JOIN bases b ON b.id = c.base_id
-         ORDER BY c.name COLLATE NOCASE`
-      )
-      .all();
+         WHERE 1=1`;
+    const params = [];
+
+    if (q) {
+      sql += ` AND (c.name LIKE ? COLLATE NOCASE OR IFNULL(c.club_nickname, '') LIKE ? COLLATE NOCASE)`;
+      const like = `%${q}%`;
+      params.push(like, like);
+    }
+
+    if (baseId === 'none') {
+      sql += ` AND c.base_id IS NULL`;
+    } else if (baseId) {
+      sql += ` AND c.base_id = ?`;
+      params.push(Number(baseId));
+    }
+
+    sql += ` ORDER BY c.name COLLATE NOCASE`;
+    return db.prepare(sql).all(...params);
+  }
+
+  function parseCustomerFilters(query = {}) {
+    const q = String(query.q || '').trim();
+    const baseId = String(query.base_id || '').trim();
+    return { q, baseId };
   }
 
   function resolveCustomerPayload(body) {
@@ -249,10 +268,13 @@ function createRouter(db) {
   }
 
   router.get('/customers', requireSellerOrAdmin, (req, res) => {
+    const filters = parseCustomerFilters(req.query);
     res.render('customers/index', {
       title: 'Clientes',
-      customers: loadCustomers(),
+      customers: loadCustomers(filters),
       bases: loadActiveBases(),
+      q: filters.q,
+      baseId: filters.baseId,
       editError: null,
       editCustomerId: null,
     });
@@ -338,6 +360,8 @@ function createRouter(db) {
         title: 'Clientes',
         customers: loadCustomers(),
         bases,
+        q: '',
+        baseId: '',
         editError: err.message,
         editCustomerId: customerId,
         editCustomer: { id: customerId, ...req.body },
