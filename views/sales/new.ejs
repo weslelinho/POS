@@ -50,16 +50,22 @@
         </select>
       </label>
       <label>Cliente (obrigatório no fiado)
-        <select name="customer_id" id="customer_id">
+        <input
+          type="search"
+          id="customer_filter"
+          placeholder="Filtrar por nome ou apelido…"
+          autocomplete="off"
+        />
+        <select name="customer_id" id="customer_id" size="8">
           <option value="">— Avulso / sem cadastro —</option>
           <optgroup label="Membros">
             <% members.forEach(m => { %>
-              <option value="<%= m.id %>" data-member="1"><%= m.name %><%= m.club_nickname ? ' (' + m.club_nickname + ')' : '' %></option>
+              <option value="<%= m.id %>" data-member="1" data-search="<%= (m.name + ' ' + (m.club_nickname || '')).toLowerCase() %>"><%= m.name %><%= m.club_nickname ? ' (' + m.club_nickname + ')' : '' %></option>
             <% }) %>
           </optgroup>
           <optgroup label="Externos">
             <% externals.forEach(e => { %>
-              <option value="<%= e.id %>" data-member="0"><%= e.name %></option>
+              <option value="<%= e.id %>" data-member="0" data-search="<%= e.name.toLowerCase() %>"><%= e.name %></option>
             <% }) %>
           </optgroup>
         </select>
@@ -122,6 +128,7 @@
   const finishBtn = document.querySelector('#btn-finish');
   const paymentMethodEl = document.querySelector('#payment_method');
   const customerEl = document.querySelector('#customer_id');
+  const customerFilterEl = document.querySelector('#customer_filter');
   const cashHelper = document.querySelector('#cash-helper');
   const pixHelper = document.querySelector('#pix-helper');
   const cashReceivedEl = document.querySelector('#cash_received');
@@ -159,6 +166,29 @@
   function isSelectedMember() {
     const opt = customerEl.selectedOptions[0];
     return Boolean(opt && opt.dataset.member === '1');
+  }
+
+  function filterCustomers() {
+    const q = String(customerFilterEl.value || '').trim().toLowerCase();
+    const selectedValue = customerEl.value;
+    let selectedStillVisible = selectedValue === '';
+
+    customerEl.querySelectorAll('optgroup').forEach((group) => {
+      let visibleCount = 0;
+      group.querySelectorAll('option').forEach((opt) => {
+        const haystack = opt.dataset.search || opt.textContent.toLowerCase();
+        const match = !q || haystack.includes(q);
+        opt.hidden = !match;
+        if (match) visibleCount += 1;
+        if (match && opt.value === selectedValue) selectedStillVisible = true;
+      });
+      group.hidden = visibleCount === 0;
+    });
+
+    if (!selectedStillVisible) {
+      customerEl.value = '';
+      updatePaymentHelpers();
+    }
   }
 
   function updatePaymentHelpers() {
@@ -314,6 +344,7 @@
 
   paymentMethodEl.addEventListener('change', updatePaymentHelpers);
   customerEl.addEventListener('change', updatePaymentHelpers);
+  customerFilterEl.addEventListener('input', filterCustomers);
   cashReceivedEl.addEventListener('input', updatePaymentHelpers);
   remainderCreditEl.addEventListener('change', updatePaymentHelpers);
 

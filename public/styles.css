@@ -389,6 +389,10 @@ th { color: var(--muted); font-weight: 600; background: rgba(0,0,0,0.35); }
   gap: 1.5rem;
 }
 
+#customer_id {
+  min-height: 11.5rem;
+}
+
 .field-hint {
   font-size: 0.8rem;
   color: var(--muted);
