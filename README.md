@@ -599,3 +599,59 @@ Software proprietário — todos os direitos reservados.
 
 Uso interno autorizado do evento / motoclube ECMC apenas. Ver o arquivo
 [`LICENSE`](./LICENSE) para os termos completos.
+
+## DNS + DHCP com dnsmasq
+sudo apt update
+sudo apt install dnsmasq
+Crie /etc/dnsmasq.d/pos-ap.conf (ajuste interface e IP):
+
+interface=wlan0
+bind-interfaces
+# Se o NetworkManager já faz DHCP, use só DNS:
+# (comente as linhas de dhcp-range abaixo)
+# Se o dnsmasq for o DHCP:
+dhcp-range=10.42.0.50,10.42.0.200,12h
+dhcp-option=option:router,10.42.0.1
+dhcp-option=option:dns-server,10.42.0.1
+# Nome fácil
+address=/pos.local/10.42.0.1
+address=/app.local/10.42.0.1
+# Captive portal: qualquer domínio → IP do AP
+address=/#/10.42.0.1
+Reinicie:
+
+sudo systemctl restart dnsmasq
+sudo systemctl enable dnsmasq
+Se o NetworkManager já gerencia o hotspot, às vezes ele conflita com o DHCP do dnsmasq — nesse caso use só as linhas address= e deixe o NM cuidar do DHCP, configurando DNS = IP do AP no hotspot.
+
+
+## Proxy na porta 80 → app :3000
+Porta 80 é o que os celulares checam no captive portal. Nginx é o caminho mais simples:
+
+sudo apt install nginx
+/etc/nginx/sites-available/pos:
+
+server {
+    listen 80 default_server;
+    server_name _;
+    location / {
+        proxy_pass http://127.0.0.1:3000;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+
+Ative e abra o firewall:
+
+sudo ln -sf /etc/nginx/sites-available/pos /etc/nginx/sites-enabled/
+sudo rm -f /etc/nginx/sites-enabled/default
+sudo nginx -t && sudo systemctl reload nginx
+sudo ufw allow 80/tcp
+Com isso:
+
+http://10.42.0.1 → app
+http://pos.local → app
+Qualquer HTTP → app (via DNS wildcard)
